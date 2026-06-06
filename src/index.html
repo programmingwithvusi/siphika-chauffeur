@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!--
+    Cordova viewport: user-scalable=no prevents pinch-zoom (native feel).
+    viewport-fit=cover extends into iPhone notch / Android cutout areas.
+  -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+                 minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+
+    <!-- Chromium / Android status-bar colour -->
+    <meta name="theme-color" content="#0A0A0C" />
+
+    <!-- iOS full-screen web-app mode -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Siphika" />
+
+    <!-- Format detection — stop iOS auto-linking phone numbers -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!--
+    Content Security Policy (must match config.xml).
+    gap: / cdvfile: / file: are Cordova's internal schemes.
+    unsafe-eval is required by Google Maps' JS runtime.
+  -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+          default-src 'self' data: gap: cdvfile: file:;
+          script-src  'self' 'unsafe-inline' 'unsafe-eval'
+                      https://maps.googleapis.com
+                      https://maps.google.com;
+          style-src   'self' 'unsafe-inline'
+                      https://fonts.googleapis.com
+                      https://maps.googleapis.com;
+          font-src    'self' data:
+                      https://fonts.gstatic.com;
+          img-src     'self' data: blob:
+                      https://*.googleapis.com
+                      https://*.gstatic.com
+                      https://*.google.com
+                      https://images.unsplash.com
+                      https://maps.gstatic.com;
+          connect-src 'self'
+                      https://maps.googleapis.com
+                      https://*.googleapis.com
+                      https://routes.googleapis.com
+                      https://images.unsplash.com;
+          frame-src   'none';
+        "
+    />
+
+    <title>Siphika</title>
+
+    <!-- Google Fonts — loaded over HTTPS, allowed by CSP above -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&family=Cinzel:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="./style.css" />
+
+    <!--
+    Google Maps JS API — loaded WITHOUT a callback parameter.
+    Using callback=initGoogleMaps here causes:
+      "initGoogleMaps is not a function"
+    because the Maps API resolves before app.js (type="module") has
+    executed and registered window.initGoogleMaps.
+
+    Libraries:
+      places  — Autocomplete on pickup/destination inputs
+      routes  — Routes API v2 (replaces legacy Directions API)
+      marker  — AdvancedMarkerElement (replaces deprecated Marker)
+
+    Instead we use loading=async with no callback. app.js waits for
+    the Maps API promise via google.maps.importLibrary() after deviceready.
+
+    APIs to enable in Google Cloud Console:
+      ✅ Maps JavaScript API
+      ✅ Routes API          (NOT the legacy "Directions API")
+      ✅ Places API (New)
+  -->
+    <script
+      async
+      src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMapsDirect"
+    ></script>
+
+    <!--
+    cordova.js is intentionally NOT loaded here.
+    It is loaded at the bottom of <body> with a guard that only
+    injects it when running inside a Cordova WebView (not a browser).
+    Loading it in <head> during browser dev causes:
+      "Uncaught SyntaxError: Unexpected token '<'"
+    because the browser fetches an HTML 404 page instead.
+  --></head>
+  <body>
+    <!-- ═══════════════════════════════════════════ SPLASH ═══ -->
+    <div id="splash" class="screen active">
+      <div class="splash-bg">
+        <div class="grain"></div>
+        <div class="spotlight"></div>
+      </div>
+      <div class="splash-content">
+        <div class="logo-emblem">
+          <svg
+            viewBox="0 0 80 80"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="40"
+              cy="40"
+              r="38"
+              stroke="var(--gold)"
+              stroke-width="1.5"
+            />
+            <path
+              d="M16 42 Q40 18 64 42"
+              stroke="var(--gold)"
+              stroke-width="1.5"
+              fill="none"
+            />
+            <ellipse
+              cx="40"
+              cy="50"
+              rx="20"
+              ry="10"
+              stroke="var(--gold)"
+              stroke-width="1.2"
+              fill="none"
+            />
+            <circle cx="27" cy="54" r="4" fill="var(--gold)" opacity="0.9" />
+            <circle cx="53" cy="54" r="4" fill="var(--gold)" opacity="0.9" />
+            <path
+              d="M20 42 L18 36 L62 36 L60 42"
+              stroke="var(--gold)"
+              stroke-width="1.2"
+              fill="none"
+            />
+            <path
+              d="M28 36 L30 28 L50 28 L52 36"
+              stroke="var(--gold)"
+              stroke-width="1"
+              fill="none"
+            />
+          </svg>
+        </div>
+        <h1 class="brand-name">SIPHIKA</h1>
+        <p class="brand-tag">Chauffeur Services</p>
+        <div class="splash-divider"></div>
+        <p class="splash-sub">Arrive in Excellence</p>
+      </div>
+      <div class="splash-footer">
+        <button class="btn-primary" onclick="goTo('onboard-1')">
+          Begin Your Journey
+        </button>
+        <button class="btn-ghost" onclick="goTo('home')">Sign In</button>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          style="margin: 4px auto 0"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ ONBOARD 1 ═══ -->
+    <div id="onboard-1" class="screen onboard">
+      <div class="onboard-art art-1">
+        <div class="grain"></div>
+        <div class="art-overlay"></div>
+        <img
+          src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&q=80"
+          alt="Luxury car"
+          class="onboard-img"
+        />
+      </div>
+      <div class="onboard-copy">
+        <div class="step-dots">
+          <span class="dot active"></span><span class="dot"></span
+          ><span class="dot"></span>
+        </div>
+        <h2>Premium Fleet<br /><em>at Your Command</em></h2>
+        <p>
+          Handpicked luxury vehicles — from executive sedans to stretch
+          limousines. Every ride, impeccably maintained.
+        </p>
+        <button class="btn-primary" onclick="goTo('onboard-2')">Next</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ ONBOARD 2 ═══ -->
+    <div id="onboard-2" class="screen onboard">
+      <div class="onboard-art art-2">
+        <div class="grain"></div>
+        <div class="art-overlay"></div>
+        <img
+          src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80"
+          alt="Chauffeur"
+          class="onboard-img"
+        />
+      </div>
+      <div class="onboard-copy">
+        <div class="step-dots">
+          <span class="dot"></span><span class="dot active"></span
+          ><span class="dot"></span>
+        </div>
+        <h2>Vetted Professional<br /><em>Chauffeurs</em></h2>
+        <p>
+          Trained, discreet and punctual. Our chauffeurs carry yourself and your
+          reputation with the utmost care.
+        </p>
+        <button class="btn-primary" onclick="goTo('onboard-3')">Next</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ ONBOARD 3 ═══ -->
+    <div id="onboard-3" class="screen onboard">
+      <div class="onboard-art art-3">
+        <div class="grain"></div>
+        <div class="art-overlay"></div>
+        <img
+          src="https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?w=800&q=80"
+          alt="City night"
+          class="onboard-img"
+        />
+      </div>
+      <div class="onboard-copy">
+        <div class="step-dots">
+          <span class="dot"></span><span class="dot"></span
+          ><span class="dot active"></span>
+        </div>
+        <h2>Book in Seconds,<br /><em>Arrive in Style</em></h2>
+        <p>
+          Instant booking, live tracking, and seamless payment. The experience
+          of luxury, without the wait.
+        </p>
+        <button class="btn-primary" onclick="goTo('register')">
+          Get Started
+        </button>
+        <button
+          class="btn-ghost"
+          onclick="goTo('login')"
+          style="margin-top: 8px"
+        >
+          Already have an account
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ REGISTER ═══ -->
+    <div id="register" class="screen form-screen">
+      <div class="form-header">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <span class="logo-sm">SIPHIKA</span>
+      </div>
+      <div class="form-body">
+        <h2>Create Account</h2>
+        <p class="form-sub">Join the circle of distinction</p>
+        <div class="input-group">
+          <label>Full Name</label>
+          <input type="text" placeholder="e.g. Thabo Nkosi" id="reg-name" />
+        </div>
+        <div class="input-group">
+          <label>Email Address</label>
+          <input type="email" placeholder="you@example.com" id="reg-email" />
+        </div>
+        <div class="input-group">
+          <label>Phone Number</label>
+          <input type="tel" placeholder="+27 71 000 0000" id="reg-phone" />
+        </div>
+        <div class="input-group">
+          <label>Password</label>
+          <input
+            type="password"
+            placeholder="Min. 8 characters"
+            id="reg-pass"
+          />
+        </div>
+        <button class="btn-primary" onclick="registerUser()">
+          Create Account
+        </button>
+        <p class="form-switch">
+          Already registered? <span onclick="goTo('login')">Sign in here</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ LOGIN ═══ -->
+    <div id="login" class="screen form-screen">
+      <div class="form-header">
+        <button class="back-btn" onclick="goTo('splash')">←</button>
+        <span class="logo-sm">SIPHIKA</span>
+      </div>
+      <div class="form-body">
+        <h2>Welcome Back</h2>
+        <p class="form-sub">Your chauffeur awaits</p>
+        <div class="input-group">
+          <label>Email Address</label>
+          <input type="email" placeholder="you@example.com" />
+        </div>
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" placeholder="••••••••" />
+        </div>
+        <p class="forgot-link">Forgot password?</p>
+        <button class="btn-primary" onclick="goTo('home')">Sign In</button>
+        <p class="form-switch">
+          New to Siphika? <span onclick="goTo('register')">Register</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ HOME ═══ -->
+    <div id="home" class="screen app-screen">
+      <div class="app-topbar">
+        <div class="topbar-left">
+          <div class="avatar" onclick="goTo('profile')">TN</div>
+          <div>
+            <p class="greeting">Good morning,</p>
+            <p class="user-name">Thabo Nkosi</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <button
+            class="theme-toggle-btn"
+            onclick="toggleTheme()"
+            aria-label="Toggle theme"
+          >
+            🌙
+          </button>
+          <button class="notif-btn" onclick="goTo('notifications')">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+            <span class="notif-badge">3</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="home-scroll">
+        <!--Hero booking card -->
+        <div class="hero-card">
+          <p class="hero-label">WHERE TO?</p>
+          <div class="route-input" onclick="goTo('book')">
+            <div class="route-icon pickup"></div>
+            <input
+              type="text"
+              placeholder="Pickup location..."
+              readonly
+              onclick="goTo('book')"
+            />
+          </div>
+          <div class="route-input" onclick="goTo('book')">
+            <div class="route-icon dropoff"></div>
+            <input
+              type="text"
+              placeholder="Destination..."
+              readonly
+              onclick="goTo('book')"
+            />
+          </div>
+          <div class="hero-actions">
+            <button class="btn-primary full-w" onclick="goTo('book')">
+              Book Now
+            </button>
+            <button class="btn-outline" onclick="goTo('schedule')">
+              Schedule
+            </button>
+          </div>
+        </div>
+
+        <!-- Services-->
+        <div class="section-header">
+          <h3>Our Fleet</h3>
+          <span onclick="goTo('book')">See all</span>
+        </div>
+        <div class="fleet-scroll">
+          <div
+            class="fleet-card active-fleet"
+            onclick="selectFleet(this, 'Executive Sedan')"
+          >
+            <div class="fleet-img">🚗</div>
+            <p class="fleet-name">Executive</p>
+            <p class="fleet-price">From R450</p>
+          </div>
+          <div class="fleet-card" onclick="selectFleet(this, 'Business Class')">
+            <div class="fleet-img">🚙</div>
+            <p class="fleet-name">Business</p>
+            <p class="fleet-price">From R680</p>
+          </div>
+          <div class="fleet-card" onclick="selectFleet(this, 'Luxury SUV')">
+            <div class="fleet-img">🛻</div>
+            <p class="fleet-name">Luxury SUV</p>
+            <p class="fleet-price">From R950</p>
+          </div>
+          <div class="fleet-card" onclick="selectFleet(this, 'Stretch Limo')">
+            <div class="fleet-img">🚐</div>
+            <p class="fleet-name">Limousine</p>
+            <p class="fleet-price">From R1,800</p>
+          </div>
+        </div>
+
+        <!-- Recent / Active ride-->
+        <div class="section-header">
+          <h3>Recent Rides</h3>
+          <span onclick="goTo('rides')">View all</span>
+        </div>
+        <div class="ride-card" onclick="goTo('tracking')">
+          <div class="ride-status-dot active"></div>
+          <div class="ride-info">
+            <p class="ride-from">OR Tambo International</p>
+            <p class="ride-arrow">→</p>
+            <p class="ride-to">Sandton City, JHB</p>
+          </div>
+          <div class="ride-meta">
+            <span class="ride-badge in-progress">In Progress</span>
+            <p class="ride-price">R620</p>
+          </div>
+        </div>
+        <div class="ride-card" onclick="goTo('rides')">
+          <div class="ride-status-dot done"></div>
+          <div class="ride-info">
+            <p class="ride-from">Rosebank Mall</p>
+            <p class="ride-arrow">→</p>
+            <p class="ride-to">Melrose Arch</p>
+          </div>
+          <div class="ride-meta">
+            <span class="ride-badge completed">Completed</span>
+            <p class="ride-price">R280</p>
+          </div>
+        </div>
+        <!-- Promo Banner -->
+        <div class="promo-banner">
+          <div class="promo-text">
+            <p class="promo-title">First Airport Ride Free</p>
+            <p class="promo-sub">
+              Use code <strong>SIPHIKA1</strong> at checkout
+            </p>
+          </div>
+          <div class="promo-icon">✈️</div>
+        </div>
+      </div>
+
+      <nav class="bottom-nav">
+        <button class="nav-item active" onclick="goTo('home')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          <span>Home</span>
+        </button>
+        <button class="nav-item" onclick="goTo('book')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+          <span>Book</span>
+        </button>
+        <button class="nav-item" onclick="goTo('rides')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span>Rides</span>
+        </button>
+        <button class="nav-item" onclick="goTo('profile')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          <span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ BOOK ═══ -->
+    <div id="book" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">New Booking</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+
+      <div class="book-scroll">
+        <div class="book-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>Pick-up & Drop-off</h4>
+            <div class="route-inputs-wrapper">
+              <div class="input-group">
+                <label>Pickup Location</label>
+                <div style="display: flex; gap: 8px; align-items: flex-end">
+                  <input
+                    type="text"
+                    placeholder="Enter address or landmark"
+                    id="book-pickup"
+                    value="OR Tambo International Airport"
+                    style="flex: 1"
+                  />
+                  <button
+                    id="geolocate-btn"
+                    class="geo-btn"
+                    onclick="useMyLocation()"
+                    title="Use my current location"
+                  >
+                    📍
+                  </button>
+                </div>
+              </div>
+              <div class="input-group">
+                <label>Destination</label>
+                <input
+                  type="text"
+                  placeholder="Where are you going?"
+                  id="book-dest"
+                  value="Sandton Convention Centre"
+                />
+              </div>
+              <button
+                class="swap-btn"
+                onclick="swapLocations()"
+                title="Swap pickup and destination"
+              >
+                ⇅
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── LIVE ROUTE MAP ───────────────────────────────────── -->
+        <div id="map-panel" class="map-panel">
+          <!-- Map canvas -->
+          <div id="booking-map" class="booking-map">
+            <!-- Shown while Maps API is loading or no route yet -->
+            <div id="map-placeholder-msg" class="map-placeholder-msg">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--gold)"
+                stroke-width="1.4"
+              >
+                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <p>Enter pickup &amp; destination<br />to see the route</p>
+            </div>
+          </div>
+
+          <!-- Route info bar — hidden until a route is returned -->
+          <div id="route-info" class="route-info hidden">
+            <div class="route-info-item">
+              <span class="route-info-icon">📏</span>
+              <div>
+                <p class="route-info-val" id="route-distance">—</p>
+                <p class="route-info-label">Distance</p>
+              </div>
+            </div>
+            <div class="route-info-divider"></div>
+            <div class="route-info-item">
+              <span class="route-info-icon">⏱️</span>
+              <div>
+                <p class="route-info-val" id="route-duration">—</p>
+                <p class="route-info-label">Drive time</p>
+              </div>
+            </div>
+            <div class="route-info-divider"></div>
+            <div class="route-info-item">
+              <span class="route-info-icon">💰</span>
+              <div>
+                <p class="route-info-val" id="route-fare">R530</p>
+                <p class="route-info-label">Est. fare</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Error message -->
+          <div id="route-error" class="route-error hidden">
+            <span>⚠️</span> Could not find a route — please check the addresses.
+          </div>
+        </div>
+
+        <div class="book-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>Date & Time</h4>
+            <div class="dt-row">
+              <div class="input-group half">
+                <label>Date</label>
+                <input type="date" id="book-date" />
+              </div>
+              <div class="input-group half">
+                <label>Time</label>
+                <input type="time" id="book-time" value="08:00" />
+              </div>
+            </div>
+            <div class="trip-type-row">
+              <button
+                class="trip-type active-type"
+                onclick="setTripType(this, 'one-way')"
+              >
+                One Way
+              </button>
+              <button class="trip-type" onclick="setTripType(this, 'return')">
+                Return
+              </button>
+              <button class="trip-type" onclick="setTripType(this, 'hourly')">
+                Hourly
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="book-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>Select Vehicle</h4>
+            <div class="vehicle-list">
+              <div
+                class="vehicle-option selected"
+                onclick="selectVehicle(this, 'Executive Sedan', 'R450')"
+              >
+                <div class="vehicle-icon">🚗</div>
+                <div class="vehicle-details">
+                  <p class="vehicle-name">Executive Sedan</p>
+                  <p class="vehicle-desc">Mercedes-Benz E-Class · 3 pax</p>
+                </div>
+                <p class="vehicle-price">R450</p>
+              </div>
+              <div
+                class="vehicle-option"
+                onclick="selectVehicle(this, 'Business Class', 'R680')"
+              >
+                <div class="vehicle-icon">🚙</div>
+                <div class="vehicle-details">
+                  <p class="vehicle-name">Business Class</p>
+                  <p class="vehicle-desc">BMW 7 Series · 3 pax</p>
+                </div>
+                <p class="vehicle-price">R680</p>
+              </div>
+              <div
+                class="vehicle-option"
+                onclick="selectVehicle(this, 'Luxury SUV', 'R950')"
+              >
+                <div class="vehicle-icon">🛻</div>
+                <div class="vehicle-details">
+                  <p class="vehicle-name">Luxury SUV</p>
+                  <p class="vehicle-desc">Range Rover · 6 pax</p>
+                </div>
+                <p class="vehicle-price">R950</p>
+              </div>
+              <div
+                class="vehicle-option"
+                onclick="selectVehicle(this, 'Stretch Limousine', 'R1,800')"
+              >
+                <div class="vehicle-icon">🚐</div>
+                <div class="vehicle-details">
+                  <p class="vehicle-name">Stretch Limousine</p>
+                  <p class="vehicle-desc">Lincoln Town Car · 10 pax</p>
+                </div>
+                <p class="vehicle-price">R1,800</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="book-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h4>Special Requests</h4>
+            <div class="extras-grid">
+              <label class="extra-toggle"
+                ><input type="checkbox" /><span>🍾 Champagne</span></label
+              >
+              <label class="extra-toggle"
+                ><input type="checkbox" /><span>💐 Flowers</span></label
+              >
+              <label class="extra-toggle"
+                ><input type="checkbox" checked /><span>🌐 WiFi</span></label
+              >
+              <label class="extra-toggle"
+                ><input type="checkbox" /><span>📰 Newspaper</span></label
+              >
+              <label class="extra-toggle"
+                ><input type="checkbox" /><span>❄️ Cold Drinks</span></label
+              >
+              <label class="extra-toggle"
+                ><input type="checkbox" /><span>🎵 Music</span></label
+              >
+            </div>
+            <div class="input-group" style="margin-top: 12px">
+              <label>Additional Notes</label>
+              <textarea
+                placeholder="e.g. Flight number, specific instructions..."
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="fare-summary">
+          <div class="fare-row"><span>Base fare</span><span>R450</span></div>
+          <div class="fare-row">
+            <span>Airport surcharge</span><span>R80</span>
+          </div>
+          <div class="fare-row"><span>Extras</span><span>R0</span></div>
+          <div class="fare-row total">
+            <span>Total</span><span id="fare-total">R530</span>
+          </div>
+        </div>
+
+        <button
+          class="btn-primary full-w"
+          style="margin: 0 0 100px"
+          onclick="goTo('confirm')"
+        >
+          Confirm Booking
+        </button>
+      </div>
+
+      <nav class="bottom-nav">
+        <button class="nav-item" onclick="goTo('home')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" /></svg
+          ><span>Home</span>
+        </button>
+        <button class="nav-item active">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" /></svg
+          ><span>Book</span>
+        </button>
+        <button class="nav-item" onclick="goTo('rides')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" /></svg
+          ><span>Rides</span>
+        </button>
+        <button class="nav-item" onclick="goTo('profile')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" /></svg
+          ><span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ CONFIRM ═══ -->
+    <div id="confirm" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Booking Summary</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="confirm-scroll">
+        <div class="confirm-vehicle-card">
+          <div class="confirm-car-icon">🚗</div>
+          <div>
+            <p class="confirm-vehicle-name">Executive Sedan</p>
+            <p class="confirm-chauffeur">Chauffeur: James Mokoena ⭐ 4.9</p>
+          </div>
+          <div class="conf-eta">ETA <strong>8 min</strong></div>
+        </div>
+
+        <div class="confirm-details">
+          <div class="conf-row">
+            <span class="conf-label">📍 Pickup</span>
+            <span class="conf-value">OR Tambo International Airport</span>
+          </div>
+          <div class="conf-row">
+            <span class="conf-label">🏁 Drop-off</span>
+            <span class="conf-value">Sandton Convention Centre</span>
+          </div>
+          <div class="conf-row">
+            <span class="conf-label">📅 Date & Time</span>
+            <span class="conf-value" id="conf-dt">Today, 08:00</span>
+          </div>
+          <div class="conf-row">
+            <span class="conf-label">🚘 Vehicle</span>
+            <span class="conf-value">Executive Sedan</span>
+          </div>
+          <div class="conf-row">
+            <span class="conf-label">🌐 Extras</span>
+            <span class="conf-value">WiFi</span>
+          </div>
+        </div>
+
+        <div class="payment-section">
+          <h4>Payment Method</h4>
+          <div class="payment-options">
+            <div class="payment-opt selected" onclick="selectPayment(this)">
+              <span>💳</span><span>Visa •••• 4242</span>
+            </div>
+            <div class="payment-opt" onclick="selectPayment(this)">
+              <span>📱</span><span>SnapScan</span>
+            </div>
+            <div class="payment-opt" onclick="selectPayment(this)">
+              <span>💵</span><span>Cash</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fare-summary">
+          <div class="fare-row total">
+            <span>Total Amount</span><span>R530</span>
+          </div>
+        </div>
+
+        <button
+          class="btn-primary full-w gold-pulse"
+          onclick="confirmBooking()"
+          style="margin-bottom: 100px"
+        >
+          Confirm & Pay R530
+        </button>
+      </div>
+
+      <nav class="bottom-nav">
+        <button class="nav-item" onclick="goTo('home')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" /></svg
+          ><span>Home</span>
+        </button>
+        <button class="nav-item active">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" /></svg
+          ><span>Book</span>
+        </button>
+        <button class="nav-item" onclick="goTo('rides')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" /></svg
+          ><span>Rides</span>
+        </button>
+        <button class="nav-item" onclick="goTo('profile')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" /></svg
+          ><span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ BOOKED SUCCESS ═══ -->
+    <div id="booked" class="screen app-screen centered-screen">
+      <div class="success-anim">
+        <div class="success-ring"></div>
+        <div class="success-ring ring2"></div>
+        <div class="success-icon">✓</div>
+      </div>
+      <h2 class="success-title">Booking Confirmed!</h2>
+      <p class="success-sub">Your chauffeur James is on the way</p>
+      <div class="booking-ref">Ref: <strong>SPK-20241215-0042</strong></div>
+      <div class="eta-chip">Arriving in <strong>8 minutes</strong> 🚗</div>
+      <button
+        class="btn-primary"
+        onclick="goTo('tracking')"
+        style="margin-top: 24px"
+      >
+        Track My Ride
+      </button>
+      <button class="btn-ghost" onclick="goTo('home')" style="margin-top: 8px">
+        Back to Home
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ TRACKING ═══ -->
+    <div id="tracking" class="screen app-screen">
+      <div class="map-placeholder">
+        <div class="map-grid"></div>
+        <div class="map-route"></div>
+        <div class="map-pin pickup-pin">📍</div>
+        <div class="map-pin dest-pin">🏁</div>
+        <div class="map-car">🚗</div>
+        <div class="map-overlay-top">
+          <button class="back-btn white" onclick="goBack()">←</button>
+          <div class="map-eta-chip">8 min away</div>
+        </div>
+      </div>
+      <div class="tracking-panel">
+        <div class="track-handle"></div>
+        <div class="chauffeur-row">
+          <div class="chauffeur-avatar">JM</div>
+          <div class="chauffeur-info">
+            <p class="chauffeur-name">James Mokoena</p>
+            <p class="chauffeur-car">Mercedes E220 · GP 123-456</p>
+            <div class="star-rating">
+              ⭐⭐⭐⭐⭐ <span>4.9 (238 trips)</span>
+            </div>
+          </div>
+          <div class="chauffeur-actions">
+            <button class="icon-btn" onclick="alert('Calling James...')">
+              📞
+            </button>
+            <button class="icon-btn" onclick="alert('Opening chat...')">
+              💬
+            </button>
+          </div>
+        </div>
+        <div class="track-route">
+          <div class="track-point">
+            <div class="track-dot gold"></div>
+            <div>
+              <p class="track-label">Pickup</p>
+              <p class="track-addr">OR Tambo International Airport</p>
+            </div>
+          </div>
+          <div class="track-line"></div>
+          <div class="track-point">
+            <div class="track-dot white"></div>
+            <div>
+              <p class="track-label">Drop-off</p>
+              <p class="track-addr">Sandton Convention Centre</p>
+            </div>
+          </div>
+        </div>
+        <div class="track-footer">
+          <div class="track-stat">
+            <p>~32 km</p>
+            <span>Distance</span>
+          </div>
+          <div class="track-stat">
+            <p>~28 min</p>
+            <span>Duration</span>
+          </div>
+          <div class="track-stat">
+            <p>R530</p>
+            <span>Fare</span>
+          </div>
+        </div>
+        <button
+          class="btn-danger"
+          onclick="if (confirm('Cancel ride?')) goTo('home');"
+        >
+          Cancel Ride
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ RIDES HISTORY ═══ -->
+    <div id="rides" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">My Rides</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="rides-scroll">
+        <div class="filter-tabs">
+          <button
+            class="filter-tab active-tab"
+            onclick="filterRides(this, 'all')"
+          >
+            All
+          </button>
+          <button class="filter-tab" onclick="filterRides(this, 'upcoming')">
+            Upcoming
+          </button>
+          <button class="filter-tab" onclick="filterRides(this, 'completed')">
+            Completed
+          </button>
+          <button class="filter-tab" onclick="filterRides(this, 'cancelled')">
+            Cancelled
+          </button>
+        </div>
+
+        <div class="rides-list" id="rides-list">
+          <div class="history-card" data-status="in-progress">
+            <div class="hc-top">
+              <span class="ride-badge in-progress">In Progress</span
+              ><span class="hc-date">Today</span>
+            </div>
+            <div class="hc-route">OR Tambo Airport → Sandton City</div>
+            <div class="hc-bottom">
+              <span class="hc-car">🚗 Executive Sedan</span
+              ><span class="hc-price">R620</span>
+            </div>
+            <button class="btn-outline sm" onclick="goTo('tracking')">
+              Track
+            </button>
+          </div>
+          <div class="history-card" data-status="completed">
+            <div class="hc-top">
+              <span class="ride-badge completed">Completed</span
+              ><span class="hc-date">12 Dec 2024</span>
+            </div>
+            <div class="hc-route">Rosebank Mall → Melrose Arch</div>
+            <div class="hc-bottom">
+              <span class="hc-car">🚗 Executive Sedan</span
+              ><span class="hc-price">R280</span>
+            </div>
+            <button class="btn-outline sm" onclick="alert('Rating submitted!')">
+              Rate Ride ⭐
+            </button>
+          </div>
+          <div class="history-card" data-status="completed">
+            <div class="hc-top">
+              <span class="ride-badge completed">Completed</span
+              ><span class="hc-date">8 Dec 2024</span>
+            </div>
+            <div class="hc-route">Sandton Drive → CSIR Pretoria</div>
+            <div class="hc-bottom">
+              <span class="hc-car">🛻 Luxury SUV</span
+              ><span class="hc-price">R1,120</span>
+            </div>
+            <button class="btn-outline sm">Receipt</button>
+          </div>
+          <div class="history-card" data-status="cancelled">
+            <div class="hc-top">
+              <span class="ride-badge cancelled">Cancelled</span
+              ><span class="hc-date">2 Dec 2024</span>
+            </div>
+            <div class="hc-route">Hyde Park → Lanseria Airport</div>
+            <div class="hc-bottom">
+              <span class="hc-car">🚙 Business Class</span
+              ><span class="hc-price">R0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <nav class="bottom-nav">
+        <button class="nav-item" onclick="goTo('home')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" /></svg
+          ><span>Home</span>
+        </button>
+        <button class="nav-item" onclick="goTo('book')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" /></svg
+          ><span>Book</span>
+        </button>
+        <button class="nav-item active">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" /></svg
+          ><span>Rides</span>
+        </button>
+        <button class="nav-item" onclick="goTo('profile')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" /></svg
+          ><span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ PROFILE ═══ -->
+    <div id="profile" class="screen app-screen">
+      <div class="profile-hero">
+        <div class="grain"></div>
+        <div class="profile-avatar-lg">TN</div>
+        <h2 class="profile-name">Thabo Nkosi</h2>
+        <p class="profile-email">thabo.nkosi@email.com</p>
+        <div class="profile-tier">
+          <span class="tier-badge">✦ Gold Member</span>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat"><strong>24</strong><span>Rides</span></div>
+        <div class="stat-div"></div>
+        <div class="stat"><strong>4.8</strong><span>Rating</span></div>
+        <div class="stat-div"></div>
+        <div class="stat"><strong>R12k+</strong><span>Spent</span></div>
+      </div>
+      <div class="profile-menu">
+        <button class="menu-item" onclick="alert('Edit profile')">
+          <span class="menu-icon">👤</span><span>Personal Information</span
+          ><span class="menu-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="alert('Manage payments')">
+          <span class="menu-icon">💳</span><span>Payment Methods</span
+          ><span class="menu-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="goTo('notifications')">
+          <span class="menu-icon">🔔</span><span>Notifications</span
+          ><span class="menu-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="alert('Favourite locations')">
+          <span class="menu-icon">📍</span><span>Saved Locations</span
+          ><span class="menu-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="alert('Refer a friend!')">
+          <span class="menu-icon">🎁</span><span>Refer & Earn</span
+          ><span class="menu-arrow new-badge">New ›</span>
+        </button>
+        <button class="menu-item" onclick="alert('Support centre')">
+          <span class="menu-icon">💬</span><span>Help & Support</span
+          ><span class="menu-arrow">›</span>
+        </button>
+        <button
+          class="menu-item danger"
+          onclick="if (confirm('Sign out?')) goTo('splash');"
+        >
+          <span class="menu-icon">🚪</span><span>Sign Out</span
+          ><span class="menu-arrow">›</span>
+        </button>
+      </div>
+      <nav class="bottom-nav">
+        <button class="nav-item" onclick="goTo('home')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" /></svg
+          ><span>Home</span>
+        </button>
+        <button class="nav-item" onclick="goTo('book')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" /></svg
+          ><span>Book</span>
+        </button>
+        <button class="nav-item" onclick="goTo('rides')">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" /></svg
+          ><span>Rides</span>
+        </button>
+        <button class="nav-item active">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" /></svg
+          ><span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ NOTIFICATIONS ═══ -->
+    <div id="notifications" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Notifications</h2>
+        <button class="btn-text" onclick="markAllRead()">Mark all read</button>
+      </div>
+      <div class="notifs-scroll">
+        <div class="notif-item unread">
+          <div class="notif-dot"></div>
+          <div class="notif-body">
+            <p class="notif-title">🚗 Your chauffeur is 5 minutes away</p>
+            <p class="notif-time">Just now</p>
+          </div>
+        </div>
+        <div class="notif-item unread">
+          <div class="notif-dot"></div>
+          <div class="notif-body">
+            <p class="notif-title">✅ Booking confirmed — Ref: SPK-0042</p>
+            <p class="notif-time">10 minutes ago</p>
+          </div>
+        </div>
+        <div class="notif-item unread">
+          <div class="notif-dot"></div>
+          <div class="notif-body">
+            <p class="notif-title">🎁 Refer a friend, earn R100 credit</p>
+            <p class="notif-time">2 hours ago</p>
+          </div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-body">
+            <p class="notif-title">⭐ Rate your last ride with James</p>
+            <p class="notif-time">Yesterday</p>
+          </div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-body">
+            <p class="notif-title">✨ You've reached Gold membership!</p>
+            <p class="notif-time">3 days ago</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast"></div>
+
+    <!--
+  app.js uses type="module" so Vite can trace and bundle it.
+  Modern Android WebView (Chrome 90+) and iOS 15 WKWebView both
+  support ES modules natively over file:// protocol.
+  All functions are attached to window.* for inline onclick="" handlers.
+-->
+    <script type="module" src="./app.js"></script>
+
+    <!--
+  cordova.js is injected HERE by the Vite plugin (see vite.config.js:
+  injectCordovaLoader). This comment is a placeholder marker.
+  DO NOT add a <script src="cordova.js"> manually — Vite will try to
+  bundle it and emit the "can't be bundled" warning.
+-->
+  </body>
+</html>

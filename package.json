@@ -1,0 +1,43 @@
+{
+  "name": "siphika-chauffeur",
+  "displayName": "Siphika",
+  "version": "1.0.0",
+  "description": "Siphika Chauffeur — Premium ride booking app",
+  "private": true,
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "assets": "node generate-assets.js",
+    "android": "npm run build && cordova run android",
+    "android:dev": "npm run build && cordova run android --device",
+    "android:rel": "npm run build && cordova build android --release",
+    "ios": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
+    "ios:dev": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
+    "ios:rel": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
+    "serve": "cordova serve",
+    "prepare": "cordova prepare"
+  },
+  "devDependencies": {
+    "cordova-android": "^15.0.0",
+    "cordova-browser": "^7.0.0",
+    "sharp": "^0.34.5",
+    "terser": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-geolocation": {
+        "GEOLOCATION_USAGE_DESCRIPTION": "Siphika uses location to set your pickup point."
+      },
+      "cordova-plugin-network-information": {},
+      "cordova-plugin-statusbar": {},
+      "cordova-plugin-inappbrowser": {},
+      "cordova-plugin-vibration": {},
+      "cordova-plugin-file": {}
+    },
+    "platforms": []
+  }
+}

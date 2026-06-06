@@ -1,0 +1,115 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="za.co.siphika.chauffeur" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Siphika</name>
+    <description>Siphika Chauffeur — Premium ride booking for South Africa</description>
+    <author email="dev@siphika.co.za" href="https://siphika.co.za">
+    Siphika Development Team
+  </author>
+    <content src="index.html" />
+    <meta content="&#xA;      default-src 'self' data: gap: cdvfile: file:;&#xA;      script-src  'self' 'unsafe-inline' 'unsafe-eval'&#xA;                  https://maps.googleapis.com&#xA;                  https://maps.google.com;&#xA;      style-src   'self' 'unsafe-inline'&#xA;                  https://fonts.googleapis.com&#xA;                  https://maps.googleapis.com;&#xA;      font-src    'self' data:&#xA;                  https://fonts.gstatic.com;&#xA;      img-src     'self' data: blob:&#xA;                  https://*.googleapis.com&#xA;                  https://*.gstatic.com&#xA;                  https://*.google.com&#xA;                  https://images.unsplash.com&#xA;                  https://maps.gstatic.com;&#xA;      connect-src 'self'&#xA;                  https://maps.googleapis.com&#xA;                  https://*.googleapis.com&#xA;                  https://routes.googleapis.com&#xA;                  https://images.unsplash.com;&#xA;      frame-src   'none';&#xA;    " http-equiv="Content-Security-Policy" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="EnableViewportScale" value="false" />
+    <preference name="BackupWebStorage" value="none" />
+    <preference name="AutoHideSplashScreen" value="true" />
+    <preference name="ShowSplashScreenSpinner" value="false" />
+    <preference name="UIWebViewDecelerationSpeed" value="normal" />
+    <preference name="KeepRunning" value="true" />
+    <platform name="android">
+        <allow-navigation href="https://maps.googleapis.com/*" />
+        <allow-navigation href="https://routes.googleapis.com/*" />
+        <allow-navigation href="https://maps.google.com/*" />
+        <allow-navigation href="https://fonts.googleapis.com/*" />
+        <allow-navigation href="https://fonts.gstatic.com/*" />
+        <allow-navigation href="https://images.unsplash.com/*" />
+        <allow-intent href="http://*/*" />
+        <allow-intent href="https://*/*" />
+        <allow-intent href="tel:*" />
+        <allow-intent href="sms:*" />
+        <allow-intent href="mailto:*" />
+        <allow-intent href="geo:*" />
+        <icon background="res/android/adaptive-icon-background-xxxhdpi.png" density="xxxhdpi" foreground="res/android/adaptive-icon-foreground-xxxhdpi.png" />
+        <icon background="res/android/adaptive-icon-background-xxhdpi.png" density="xxhdpi" foreground="res/android/adaptive-icon-foreground-xxhdpi.png" />
+        <icon background="res/android/adaptive-icon-background-xhdpi.png" density="xhdpi" foreground="res/android/adaptive-icon-foreground-xhdpi.png" />
+        <icon background="res/android/adaptive-icon-background-hdpi.png" density="hdpi" foreground="res/android/adaptive-icon-foreground-hdpi.png" />
+        <icon background="res/android/adaptive-icon-background-mdpi.png" density="mdpi" foreground="res/android/adaptive-icon-foreground-mdpi.png" />
+        <icon density="ldpi" src="res/android/icon-ldpi.png" />
+        <icon density="mdpi" src="res/android/icon-mdpi.png" />
+        <icon density="hdpi" src="res/android/icon-hdpi.png" />
+        <icon density="xhdpi" src="res/android/icon-xhdpi.png" />
+        <icon density="xxhdpi" src="res/android/icon-xxhdpi.png" />
+        <icon density="xxxhdpi" src="res/android/icon-xxxhdpi.png" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/android/splash-icon.png" />
+        <preference name="AndroidWindowSplashScreenBackground" value="#0A0A0C" />
+        <preference name="AndroidWindowSplashScreenIconBackgroundColor" value="#0A0A0C" />
+        <preference name="AndroidWindowSplashScreenAnimationDuration" value="300" />
+        <uses-permission android:name="android.permission.INTERNET" />
+        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+        <uses-permission android:name="android.permission.VIBRATE" />
+        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+            <application android:usesCleartextTraffic="false" />
+        </edit-config>
+        <preference name="android-minSdkVersion" value="24" />
+        <preference name="android-targetSdkVersion" value="35" />
+        <preference name="android-compileSdkVersion" value="35" />
+        <preference name="android-targetSdkVersion" value="36" />
+        <preference name="android-compileSdkVersion" value="36" />
+        <preference name="StatusBarOverlaysWebView" value="true" />
+        <preference name="StatusBarBackgroundColor" value="#0A0A0C" />
+        <preference name="StatusBarStyle" value="lightcontent" />
+        <preference name="AndroidPersistentFileLocation" value="Compatibility" />
+        <preference name="Fullscreen" value="false" />
+    </platform>
+    <platform name="ios">
+        <allow-navigation href="https://maps.googleapis.com/*" />
+        <allow-navigation href="https://maps.google.com/*" />
+        <allow-navigation href="https://fonts.googleapis.com/*" />
+        <allow-navigation href="https://fonts.gstatic.com/*" />
+        <allow-navigation href="https://images.unsplash.com/*" />
+        <allow-intent href="itms:*" />
+        <allow-intent href="itms-apps:*" />
+        <allow-intent href="tel:*" />
+        <allow-intent href="mailto:*" />
+        <icon height="20" src="res/ios/icon-20.png" width="20" />
+        <icon height="40" src="res/ios/icon-20@2x.png" width="40" />
+        <icon height="60" src="res/ios/icon-20@3x.png" width="60" />
+        <icon height="29" src="res/ios/icon-29.png" width="29" />
+        <icon height="58" src="res/ios/icon-29@2x.png" width="58" />
+        <icon height="87" src="res/ios/icon-29@3x.png" width="87" />
+        <icon height="40" src="res/ios/icon-40.png" width="40" />
+        <icon height="80" src="res/ios/icon-40@2x.png" width="80" />
+        <icon height="120" src="res/ios/icon-40@3x.png" width="120" />
+        <icon height="120" src="res/ios/icon-60@2x.png" width="120" />
+        <icon height="180" src="res/ios/icon-60@3x.png" width="180" />
+        <icon height="76" src="res/ios/icon-76.png" width="76" />
+        <icon height="152" src="res/ios/icon-76@2x.png" width="152" />
+        <icon height="167" src="res/ios/icon-83.5@2x.png" width="167" />
+        <icon height="1024" src="res/ios/icon-1024.png" width="1024" />
+        <splash src="res/ios/Default@2x~universal~anyany.png" />
+        <preference name="deployment-target" value="15.0" />
+        <preference name="SwiftVersion" value="5" />
+        <preference name="WKWebViewOnly" value="true" />
+        <preference name="CordovaWebViewEngine" value="CDVWKWebViewEngine" />
+        <preference name="StatusBarOverlaysWebView" value="true" />
+        <preference name="StatusBarBackgroundColor" value="#0A0A0C" />
+        <preference name="StatusBarStyle" value="lightcontent" />
+        <preference name="AllowInlineMediaPlayback" value="true" />
+        <preference name="MediaPlaybackRequiresUserAction" value="false" />
+        <preference name="UseLegacyNavigator" value="false" />
+        <edit-config file="*-Info.plist" mode="merge" target="NSLocationWhenInUseUsageDescription">
+            <string>Siphika uses your location to set pickup and show nearby drivers.</string>
+        </edit-config>
+        <edit-config file="*-Info.plist" mode="merge" target="NSLocationAlwaysAndWhenInUseUsageDescription">
+            <string>Siphika uses your location for ride tracking and driver navigation.</string>
+        </edit-config>
+    </platform>
+    <plugin name="cordova-plugin-geolocation" spec="^5.0.0">
+        <variable name="GEOLOCATION_USAGE_DESCRIPTION" value="Siphika uses location to set your pickup point." />
+    </plugin>
+    <plugin name="cordova-plugin-network-information" spec="^4.0.0" />
+    <plugin name="cordova-plugin-statusbar" spec="^5.0.0" />
+    <plugin name="cordova-plugin-inappbrowser" spec="^6.0.0" />
+    <plugin name="cordova-plugin-vibration" spec="^3.1.1" />
+    <plugin name="cordova-plugin-file" spec="^8.0.0" />
+</widget>
