@@ -5,16 +5,16 @@
 
 // ─── GOOGLE MAPS STATE ───────────────────────────────────
 const mapState = {
-  map:                 null,
-  routesClient:        null,   // Routes API v2 client
-  routePolyline:       null,   // google.maps.Polyline for the drawn route
-  AdvancedMarker:      null,   // AdvancedMarkerElement constructor ref
-  pickupAutocomplete:  null,
-  destAutocomplete:    null,
-  initialized:         false,
-  routeDrawn:          false,
-  _markerA:            null,   // gold pickup marker
-  _markerB:            null,   // white destination marker
+  map: null,
+  routesClient: null, // Routes API v2 client
+  routePolyline: null, // google.maps.Polyline for the drawn route
+  AdvancedMarker: null, // AdvancedMarkerElement constructor ref
+  pickupAutocomplete: null,
+  destAutocomplete: null,
+  initialized: false,
+  routeDrawn: false,
+  _markerA: null, // gold pickup marker
+  _markerB: null, // white destination marker
 };
 
 /**
@@ -47,16 +47,24 @@ async function initGoogleMaps() {
 
   // Wait for google.maps to be available (script tag may still be loading)
   if (typeof google === 'undefined' || !google.maps) {
-    console.warn('[Siphika] Google Maps not loaded — check API key and script tag');
+    console.warn(
+      '[Siphika] Google Maps not loaded — check API key and script tag',
+    );
     return;
   }
 
   // importLibrary requires the bootstrap loader pattern.
   // If not available (old script tag format), fall back gracefully.
   if (typeof google.maps.importLibrary !== 'function') {
-    console.warn('[Siphika] importLibrary not available — check script tag uses bootstrap loader (no libraries= param)');
+    console.warn(
+      '[Siphika] importLibrary not available — check script tag uses bootstrap loader (no libraries= param)',
+    );
     // Try direct instantiation as fallback
-    try { await initMapsDirect(); } catch (e) { console.error(e); }
+    try {
+      await initMapsDirect();
+    } catch (e) {
+      console.error(e);
+    }
     return;
   }
 
@@ -75,12 +83,12 @@ async function initGoogleMaps() {
     // We use styles (local JSON) so dark/light theme switching works.
     // AdvancedMarkerElement works without a mapId via DEMO_MAP_ID.
     mapState.map = new mapsLib.Map(mapEl, {
-      center:           { lat: -26.2041, lng: 28.0473 },
-      zoom:             11,
-      styles:           getMapStyle(),   // local dark or light theme
+      center: { lat: -26.2041, lng: 28.0473 },
+      zoom: 11,
+      styles: getMapStyle(), // local dark or light theme
       disableDefaultUI: true,
-      gestureHandling:  'cooperative',
-      zoomControl:      true,
+      gestureHandling: 'cooperative',
+      zoomControl: true,
       // mapId intentionally omitted — conflicts with styles property
       zoomControlOptions: {
         position: google.maps.ControlPosition.RIGHT_CENTER,
@@ -89,9 +97,9 @@ async function initGoogleMaps() {
 
     // ── Polyline for the route drawn from Routes API response ──
     mapState.routePolyline = new google.maps.Polyline({
-      map:           mapState.map,
-      strokeColor:   '#C9A84C',
-      strokeWeight:  4,
+      map: mapState.map,
+      strokeColor: '#C9A84C',
+      strokeWeight: 4,
       strokeOpacity: 0.9,
     });
 
@@ -100,26 +108,31 @@ async function initGoogleMaps() {
 
     // ── Autocomplete ──────────────────────────────────────
     const pickupInput = document.getElementById('book-pickup');
-    const destInput   = document.getElementById('book-dest');
+    const destInput = document.getElementById('book-dest');
 
     const acOptions = {
       componentRestrictions: { country: 'za' },
-      fields:       ['formatted_address', 'geometry', 'name'],
+      fields: ['formatted_address', 'geometry', 'name'],
       strictBounds: false,
     };
 
-    mapState.pickupAutocomplete = new placesLib.Autocomplete(pickupInput, acOptions);
-    mapState.destAutocomplete   = new placesLib.Autocomplete(destInput,   acOptions);
+    mapState.pickupAutocomplete = new placesLib.Autocomplete(
+      pickupInput,
+      acOptions,
+    );
+    mapState.destAutocomplete = new placesLib.Autocomplete(
+      destInput,
+      acOptions,
+    );
 
     mapState.pickupAutocomplete.addListener('place_changed', () => drawRoute());
-    mapState.destAutocomplete.addListener('place_changed',   () => drawRoute());
+    mapState.destAutocomplete.addListener('place_changed', () => drawRoute());
 
     pickupInput.addEventListener('change', debounce(drawRoute, 600));
-    destInput.addEventListener('change',   debounce(drawRoute, 600));
+    destInput.addEventListener('change', debounce(drawRoute, 600));
 
     mapState.initialized = true;
     drawRoute();
-
   } catch (err) {
     console.error('[Siphika] Google Maps failed to initialise:', err);
     showMapError();
@@ -130,25 +143,33 @@ async function initGoogleMaps() {
 async function initMapsDirect() {
   const mapEl = document.getElementById('booking-map');
   mapState.map = new google.maps.Map(mapEl, {
-    center:           { lat: -26.2041, lng: 28.0473 },
-    zoom:             11,
-    styles:           getMapStyle(),
+    center: { lat: -26.2041, lng: 28.0473 },
+    zoom: 11,
+    styles: getMapStyle(),
     disableDefaultUI: true,
-    gestureHandling:  'cooperative',
+    gestureHandling: 'cooperative',
   });
   mapState.routePolyline = new google.maps.Polyline({
-    map: mapState.map, strokeColor: '#C9A84C',
-    strokeWeight: 4, strokeOpacity: 0.9,
+    map: mapState.map,
+    strokeColor: '#C9A84C',
+    strokeWeight: 4,
+    strokeOpacity: 0.9,
   });
   const pickupInput = document.getElementById('book-pickup');
-  const destInput   = document.getElementById('book-dest');
-  const acOptions   = { componentRestrictions: { country: 'za' } };
-  mapState.pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, acOptions);
-  mapState.destAutocomplete   = new google.maps.places.Autocomplete(destInput,   acOptions);
+  const destInput = document.getElementById('book-dest');
+  const acOptions = { componentRestrictions: { country: 'za' } };
+  mapState.pickupAutocomplete = new google.maps.places.Autocomplete(
+    pickupInput,
+    acOptions,
+  );
+  mapState.destAutocomplete = new google.maps.places.Autocomplete(
+    destInput,
+    acOptions,
+  );
   mapState.pickupAutocomplete.addListener('place_changed', () => drawRoute());
-  mapState.destAutocomplete.addListener('place_changed',   () => drawRoute());
-  mapState.AdvancedMarker     = null; // fall back to legacy Marker
-  mapState.initialized        = true;
+  mapState.destAutocomplete.addListener('place_changed', () => drawRoute());
+  mapState.AdvancedMarker = null; // fall back to legacy Marker
+  mapState.initialized = true;
   drawRoute();
 }
 
@@ -181,18 +202,18 @@ function showMapError() {
  */
 async function drawRoute() {
   const pickup = document.getElementById('book-pickup')?.value.trim();
-  const dest   = document.getElementById('book-dest')?.value.trim();
+  const dest = document.getElementById('book-dest')?.value.trim();
 
-  if (!pickup || !dest)          return;
-  if (!mapState.initialized)     return;
-  if (!mapState.routePolyline)   return;
+  if (!pickup || !dest) return;
+  if (!mapState.initialized) return;
+  if (!mapState.routePolyline) return;
 
   showMapLoading(true);
   hideRouteError();
 
   // Extract the API key from the Maps script src
   const apiKey = getApiKey();
-  if (!apiKey || apiKey === 'YOUR_API_KEY') {
+  if (!apiKey || apiKey === '_MAPS_KEY_') {
     showMapLoading(false);
     showRouteError('NO_KEY');
     return;
@@ -204,8 +225,8 @@ async function drawRoute() {
       {
         method: 'POST',
         headers: {
-          'Content-Type':         'application/json',
-          'X-Goog-Api-Key':       apiKey,
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
           // Field mask — only request what we need (controls billing)
           'X-Goog-FieldMask':
             'routes.duration,routes.distanceMeters,' +
@@ -220,14 +241,14 @@ async function drawRoute() {
           destination: {
             address: dest,
           },
-          travelMode:         'DRIVE',
-          routingPreference:  'TRAFFIC_AWARE',
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_AWARE',
           computeAlternativeRoutes: false,
-          languageCode:       'en-ZA',
-          regionCode:         'ZA',
-          units:              'METRIC',
+          languageCode: 'en-ZA',
+          regionCode: 'ZA',
+          units: 'METRIC',
         }),
-      }
+      },
     );
 
     showMapLoading(false);
@@ -246,39 +267,48 @@ async function drawRoute() {
       return;
     }
 
-    const route      = data.routes[0];
-    const leg        = route.legs?.[0];
-    const distMeters = route.distanceMeters;             // e.g. 32400
-    const distKm     = distMeters / 1000;                // e.g. 32.4
-    const distText   = distKm.toFixed(1) + ' km';
-    const durSec     = parseInt(route.duration);         // seconds
-    const durText    = durSec >= 3600
-      ? Math.floor(durSec / 3600) + 'h ' + Math.round((durSec % 3600) / 60) + ' min'
-      : Math.round(durSec / 60) + ' mins';
+    const route = data.routes[0];
+    const leg = route.legs?.[0];
+    const distMeters = route.distanceMeters; // e.g. 32400
+    const distKm = distMeters / 1000; // e.g. 32.4
+    const distText = distKm.toFixed(1) + ' km';
+    const durSec = parseInt(route.duration); // seconds
+    const durText =
+      durSec >= 3600
+        ? Math.floor(durSec / 3600) +
+          'h ' +
+          Math.round((durSec % 3600) / 60) +
+          ' min'
+        : Math.round(durSec / 60) + ' mins';
 
     // ── Decode and draw the polyline ─────────────────────
-    const encoded   = route.polyline.encodedPolyline;
-    const path      = decodePolyline(encoded);
+    const encoded = route.polyline.encodedPolyline;
+    const path = decodePolyline(encoded);
     mapState.routePolyline.setPath(path);
 
     // Fit map bounds to the route
     const bounds = new google.maps.LatLngBounds();
-    path.forEach(p => bounds.extend(p));
-    mapState.map.fitBounds(bounds, { top: 60, right: 30, bottom: 20, left: 30 });
+    path.forEach((p) => bounds.extend(p));
+    mapState.map.fitBounds(bounds, {
+      top: 60,
+      right: 30,
+      bottom: 20,
+      left: 30,
+    });
 
     // ── Custom gold markers ───────────────────────────────
     if (leg) {
       const startLat = leg.startLocation?.latLng?.latitude;
       const startLng = leg.startLocation?.latLng?.longitude;
-      const endLat   = leg.endLocation?.latLng?.latitude;
-      const endLng   = leg.endLocation?.latLng?.longitude;
+      const endLat = leg.endLocation?.latLng?.latitude;
+      const endLng = leg.endLocation?.latLng?.longitude;
 
       if (startLat && endLat) {
         placeCustomMarkers(
           { lat: startLat, lng: startLng },
-          { lat: endLat,   lng: endLng   },
+          { lat: endLat, lng: endLng },
           leg.startAddress || pickup,
-          leg.endAddress   || dest
+          leg.endAddress || dest,
         );
       }
     }
@@ -292,7 +322,6 @@ async function drawRoute() {
 
     // ── Live fare from real distance ──────────────────────
     updateFareFromDistance(distKm);
-
   } catch (err) {
     showMapLoading(false);
     console.error('[Siphika] drawRoute error:', err);
@@ -307,11 +336,13 @@ async function drawRoute() {
 function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
   // Remove old markers cleanly (AdvancedMarker uses .map = null, legacy uses .setMap(null))
   if (mapState._markerA) {
-    if (typeof mapState._markerA.setMap === 'function') mapState._markerA.setMap(null);
+    if (typeof mapState._markerA.setMap === 'function')
+      mapState._markerA.setMap(null);
     else mapState._markerA.map = null;
   }
   if (mapState._markerB) {
-    if (typeof mapState._markerB.setMap === 'function') mapState._markerB.setMap(null);
+    if (typeof mapState._markerB.setMap === 'function')
+      mapState._markerB.setMap(null);
     else mapState._markerB.map = null;
   }
 
@@ -326,9 +357,9 @@ function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
 
     mapState._markerA = new AdvancedMarker({
       position: startPos,
-      map:      mapState.map,
-      title:    startTitle,
-      content:  pinA,
+      map: mapState.map,
+      title: startTitle,
+      content: pinA,
     });
 
     const pinB = document.createElement('div');
@@ -338,29 +369,34 @@ function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
 
     mapState._markerB = new AdvancedMarker({
       position: endPos,
-      map:      mapState.map,
-      title:    endTitle,
-      content:  pinB,
+      map: mapState.map,
+      title: endTitle,
+      content: pinB,
     });
-
   } else {
     // ── Legacy Marker fallback ────────────────────────────
     const sym = (color, stroke) => ({
-      path:         google.maps.SymbolPath.CIRCLE,
-      scale:        9,
-      fillColor:    color,
-      fillOpacity:  1,
-      strokeColor:  stroke,
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 9,
+      fillColor: color,
+      fillOpacity: 1,
+      strokeColor: stroke,
       strokeWeight: 2.5,
     });
 
     mapState._markerA = new google.maps.Marker({
-      position: startPos, map: mapState.map,
-      icon: sym('#C9A84C', '#0A0A0C'), title: startTitle, zIndex: 10,
+      position: startPos,
+      map: mapState.map,
+      icon: sym('#C9A84C', '#0A0A0C'),
+      title: startTitle,
+      zIndex: 10,
     });
     mapState._markerB = new google.maps.Marker({
-      position: endPos, map: mapState.map,
-      icon: sym('#F0EDE4', '#C9A84C'), title: endTitle, zIndex: 10,
+      position: endPos,
+      map: mapState.map,
+      icon: sym('#F0EDE4', '#C9A84C'),
+      title: endTitle,
+      zIndex: 10,
     });
   }
 }
@@ -372,24 +408,29 @@ function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
  */
 function decodePolyline(encoded) {
   const points = [];
-  let index = 0, lat = 0, lng = 0;
+  let index = 0,
+    lat = 0,
+    lng = 0;
 
   while (index < encoded.length) {
-    let shift = 0, result = 0, byte;
+    let shift = 0,
+      result = 0,
+      byte;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-    lat += (result & 1) ? ~(result >> 1) : result >> 1;
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
 
-    shift = 0; result = 0;
+    shift = 0;
+    result = 0;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-    lng += (result & 1) ? ~(result >> 1) : result >> 1;
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
 
     points.push(new google.maps.LatLng(lat / 1e5, lng / 1e5));
   }
@@ -398,7 +439,9 @@ function decodePolyline(encoded) {
 
 /** Extract the API key from the Maps script src at runtime */
 function getApiKey() {
-  const scripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+  const scripts = document.querySelectorAll(
+    'script[src*="maps.googleapis.com"]',
+  );
   for (const s of scripts) {
     const match = s.src.match(/[?&]key=([^&]+)/);
     if (match) return match[1];
@@ -413,27 +456,30 @@ function getApiKey() {
  */
 function updateFareFromDistance(distKm) {
   const ratePerKm = {
-    'Executive Sedan':   14,
-    'Business Class':    20,
-    'Luxury SUV':        28,
+    'Executive Sedan': 14,
+    'Business Class': 20,
+    'Luxury SUV': 28,
     'Stretch Limousine': 55,
   };
 
-  const vehicleName  = state.selectedVehicle?.name || 'Executive Sedan';
-  const base         = state.selectedVehicle?.price || 450;
-  const rate         = ratePerKm[vehicleName] ?? 14;
+  const vehicleName = state.selectedVehicle?.name || 'Executive Sedan';
+  const base = state.selectedVehicle?.price || 450;
+  const rate = ratePerKm[vehicleName] ?? 14;
   const distanceFare = Math.round(distKm * rate);
-  const surcharge    = 80;
-  const total        = Math.max(base, distanceFare) + surcharge;
+  const surcharge = 80;
+  const total = Math.max(base, distanceFare) + surcharge;
 
   // Update fare fields
   state.currentFare = total;
-  document.getElementById('route-fare').textContent  = `R${total.toLocaleString()}`;
-  document.getElementById('fare-total').textContent  = `R${total.toLocaleString()}`;
+  document.getElementById('route-fare').textContent =
+    `R${total.toLocaleString()}`;
+  document.getElementById('fare-total').textContent =
+    `R${total.toLocaleString()}`;
 
   // Keep the base fare row accurate too
   const baseRow = document.querySelector('.fare-row span:last-child');
-  if (baseRow) baseRow.textContent = `R${Math.max(base, distanceFare).toLocaleString()}`;
+  if (baseRow)
+    baseRow.textContent = `R${Math.max(base, distanceFare).toLocaleString()}`;
 }
 
 // ── Map UI helpers ──────────────────────────────────────
@@ -455,19 +501,20 @@ function showRouteError(status) {
   el.classList.remove('hidden');
   const msgs = {
     // Routes API v2 status codes
-    NOT_FOUND:              'One or both addresses could not be found.',
-    ZERO_RESULTS:           'No driving route found between these locations.',
-    INVALID_ARGUMENT:       'Invalid address — please check pickup and destination.',
-    RESOURCE_EXHAUSTED:     'API quota exceeded — please try again shortly.',
-    PERMISSION_DENIED:      'API key invalid or Routes API not enabled in Cloud Console.',
-    UNAUTHENTICATED:        'API key missing or not authorised.',
-    NETWORK_ERROR:          'Network error — check your internet connection.',
+    NOT_FOUND: 'One or both addresses could not be found.',
+    ZERO_RESULTS: 'No driving route found between these locations.',
+    INVALID_ARGUMENT: 'Invalid address — please check pickup and destination.',
+    RESOURCE_EXHAUSTED: 'API quota exceeded — please try again shortly.',
+    PERMISSION_DENIED:
+      'API key invalid or Routes API not enabled in Cloud Console.',
+    UNAUTHENTICATED: 'API key missing or not authorised.',
+    NETWORK_ERROR: 'Network error — check your internet connection.',
     // Extra guards
-    NO_KEY:                 'No API key set — add your key to the Maps script tag.',
-    HTTP_403:               'Routes API not enabled — check Google Cloud Console.',
-    HTTP_400:               'Bad request — check pickup and destination addresses.',
+    NO_KEY: 'No API key set — add your key to the Maps script tag.',
+    HTTP_403: 'Routes API not enabled — check Google Cloud Console.',
+    HTTP_400: 'Bad request — check pickup and destination addresses.',
   };
-  el.innerHTML = `<span>⚠️</span> ${msgs[status] || 'Could not calculate route ('+status+').'}`;
+  el.innerHTML = `<span>⚠️</span> ${msgs[status] || 'Could not calculate route (' + status + ').'}`;
 }
 
 function hideRouteError() {
@@ -480,8 +527,8 @@ function swapLocations() {
   const d = document.getElementById('book-dest');
   if (!p || !d) return;
   const tmp = p.value;
-  p.value   = d.value;
-  d.value   = tmp;
+  p.value = d.value;
+  d.value = tmp;
   showToast('Locations swapped');
   drawRoute();
 }
@@ -495,14 +542,13 @@ function debounce(fn, delay) {
   };
 }
 
-
 const state = {
   history: ['splash'],
   currentScreen: 'splash',
   selectedVehicle: { name: 'Executive Sedan', price: 450 },
   selectedTripType: 'one-way',
   _backPressedOnce: false,
-  user: { name: 'Thabo Nkosi', email: 'thabo.nkosi@email.com', initials: 'TN' }
+  user: { name: 'Thabo Nkosi', email: 'thabo.nkosi@email.com', initials: 'TN' },
 };
 
 // ─── THEME SYSTEM ─────────────────────────────────────────
@@ -510,7 +556,7 @@ const state = {
 // Applied as data-theme="dark"|"light" on <html>.
 // All components react via CSS [data-theme="light"] overrides.
 // Maps style also recomputes when theme changes.
-const THEME_KEY  = 'siphika-theme';
+const THEME_KEY = 'siphika-theme';
 let currentTheme = 'dark';
 
 function initTheme() {
@@ -524,9 +570,9 @@ function initTheme() {
 function applyTheme(animate = true) {
   document.documentElement.setAttribute('data-theme', currentTheme);
   const icon = currentTheme === 'dark' ? '🌙' : '☀️';
-  const label = currentTheme === 'dark'
-    ? 'Switch to light mode' : 'Switch to dark mode';
-  document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+  const label =
+    currentTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  document.querySelectorAll('.theme-toggle-btn').forEach((btn) => {
     btn.textContent = icon;
     btn.title = label;
     btn.setAttribute('aria-label', label);
@@ -535,12 +581,15 @@ function applyTheme(animate = true) {
   if (mapState.map && window.google?.maps) {
     mapState.map.setOptions({ styles: getMapStyle() });
   }
-  if (animate) showToast(currentTheme === 'dark' ? '🌙 Dark mode' : '☀️ Light mode');
+  if (animate)
+    showToast(currentTheme === 'dark' ? '🌙 Dark mode' : '☀️ Light mode');
 }
 
 function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  try { localStorage.setItem(THEME_KEY, currentTheme); } catch (_) {}
+  try {
+    localStorage.setItem(THEME_KEY, currentTheme);
+  } catch (_) {}
   applyTheme(true);
 }
 
@@ -548,27 +597,75 @@ function toggleTheme() {
 function getMapStyle() {
   if (currentTheme === 'dark') {
     return [
-      { elementType: 'geometry',           stylers: [{ color: '#0D0F14' }] },
-      { elementType: 'labels.text.fill',   stylers: [{ color: '#8A8580' }] },
+      { elementType: 'geometry', stylers: [{ color: '#0D0F14' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#8A8580' }] },
       { elementType: 'labels.text.stroke', stylers: [{ color: '#0A0A0C' }] },
-      { featureType: 'road',               elementType: 'geometry',         stylers: [{ color: '#1C1C24' }] },
-      { featureType: 'road.highway',       elementType: 'geometry',         stylers: [{ color: '#2A2420' }] },
-      { featureType: 'road.highway',       elementType: 'labels.text.fill', stylers: [{ color: '#C9A84C' }] },
-      { featureType: 'poi',                elementType: 'geometry',         stylers: [{ color: '#111115' }] },
-      { featureType: 'water',              elementType: 'geometry',         stylers: [{ color: '#0A0D14' }] },
-      { featureType: 'landscape',          elementType: 'geometry',         stylers: [{ color: '#0D0D10' }] },
+      {
+        featureType: 'road',
+        elementType: 'geometry',
+        stylers: [{ color: '#1C1C24' }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'geometry',
+        stylers: [{ color: '#2A2420' }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#C9A84C' }],
+      },
+      {
+        featureType: 'poi',
+        elementType: 'geometry',
+        stylers: [{ color: '#111115' }],
+      },
+      {
+        featureType: 'water',
+        elementType: 'geometry',
+        stylers: [{ color: '#0A0D14' }],
+      },
+      {
+        featureType: 'landscape',
+        elementType: 'geometry',
+        stylers: [{ color: '#0D0D10' }],
+      },
     ];
   }
   return [
-    { elementType: 'geometry',           stylers: [{ color: '#EDE8DE' }] },
-    { elementType: 'labels.text.fill',   stylers: [{ color: '#6B6560' }] },
+    { elementType: 'geometry', stylers: [{ color: '#EDE8DE' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#6B6560' }] },
     { elementType: 'labels.text.stroke', stylers: [{ color: '#FAF8F4' }] },
-    { featureType: 'road',               elementType: 'geometry',         stylers: [{ color: '#FFFFFF' }] },
-    { featureType: 'road.highway',       elementType: 'geometry',         stylers: [{ color: '#F5EDD8' }] },
-    { featureType: 'road.highway',       elementType: 'labels.text.fill', stylers: [{ color: '#9E7B2A' }] },
-    { featureType: 'poi',                elementType: 'geometry',         stylers: [{ color: '#E8E2D6' }] },
-    { featureType: 'water',              elementType: 'geometry',         stylers: [{ color: '#C8D8E8' }] },
-    { featureType: 'landscape',          elementType: 'geometry',         stylers: [{ color: '#EDE8DE' }] },
+    {
+      featureType: 'road',
+      elementType: 'geometry',
+      stylers: [{ color: '#FFFFFF' }],
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'geometry',
+      stylers: [{ color: '#F5EDD8' }],
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#9E7B2A' }],
+    },
+    {
+      featureType: 'poi',
+      elementType: 'geometry',
+      stylers: [{ color: '#E8E2D6' }],
+    },
+    {
+      featureType: 'water',
+      elementType: 'geometry',
+      stylers: [{ color: '#C8D8E8' }],
+    },
+    {
+      featureType: 'landscape',
+      elementType: 'geometry',
+      stylers: [{ color: '#EDE8DE' }],
+    },
   ];
 }
 
@@ -639,10 +736,10 @@ function updateGreeting() {
 
 // ─── REGISTRATION ────────────────────────────────────────
 function registerUser() {
-  const name  = document.getElementById('reg-name')?.value.trim();
+  const name = document.getElementById('reg-name')?.value.trim();
   const email = document.getElementById('reg-email')?.value.trim();
   const phone = document.getElementById('reg-phone')?.value.trim();
-  const pass  = document.getElementById('reg-pass')?.value;
+  const pass = document.getElementById('reg-pass')?.value;
 
   if (!name || !email || !phone || !pass) {
     showToast('Please fill in all fields');
@@ -659,7 +756,12 @@ function registerUser() {
 
   // Update state with user name
   state.user.name = name;
-  state.user.initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  state.user.initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   showToast('Account created! Welcome to Siphika ✦');
   setTimeout(() => goTo('home'), 800);
@@ -667,14 +769,18 @@ function registerUser() {
 
 // ─── FLEET SELECTION (HOME) ──────────────────────────────
 function selectFleet(el, name) {
-  document.querySelectorAll('.fleet-card').forEach(c => c.classList.remove('active-fleet'));
+  document
+    .querySelectorAll('.fleet-card')
+    .forEach((c) => c.classList.remove('active-fleet'));
   el.classList.add('active-fleet');
   showToast(`${name} selected`);
 }
 
 // ─── VEHICLE SELECTION (BOOK) ────────────────────────────
 function selectVehicle(el, name, price) {
-  document.querySelectorAll('.vehicle-option').forEach(v => v.classList.remove('selected'));
+  document
+    .querySelectorAll('.vehicle-option')
+    .forEach((v) => v.classList.remove('selected'));
   el.classList.add('selected');
   const priceNum = parseInt(price.replace(/[^0-9]/g, ''));
   state.selectedVehicle = { name, price: priceNum };
@@ -683,7 +789,9 @@ function selectVehicle(el, name, price) {
 
 // ─── TRIP TYPE ───────────────────────────────────────────
 function setTripType(el, type) {
-  document.querySelectorAll('.trip-type').forEach(t => t.classList.remove('active-type'));
+  document
+    .querySelectorAll('.trip-type')
+    .forEach((t) => t.classList.remove('active-type'));
   el.classList.add('active-type');
   state.selectedTripType = type;
 
@@ -714,11 +822,14 @@ function updateFareSummary() {
     totalEl.textContent = `R${total.toLocaleString()}`;
     totalEl.style.color = 'var(--gold)';
     // Flash animation
-    totalEl.animate([
-      { transform: 'scale(1)' },
-      { transform: 'scale(1.12)', color: '#E8C96B' },
-      { transform: 'scale(1)' }
-    ], { duration: 300 });
+    totalEl.animate(
+      [
+        { transform: 'scale(1)' },
+        { transform: 'scale(1.12)', color: '#E8C96B' },
+        { transform: 'scale(1)' },
+      ],
+      { duration: 300 },
+    );
   }
   state.currentFare = total;
 }
@@ -741,9 +852,14 @@ function updateConfirmDetails() {
   const date = dateInput?.value || new Date().toISOString().split('T')[0];
   const time = timeInput?.value || '08:00';
   const d = new Date(date + 'T' + time);
-  const formatted = d.toLocaleDateString('en-ZA', {
-    weekday: 'short', day: 'numeric', month: 'short'
-  }) + ', ' + time;
+  const formatted =
+    d.toLocaleDateString('en-ZA', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    }) +
+    ', ' +
+    time;
   dateEl.textContent = formatted;
 
   // Update confirm button with fare
@@ -778,49 +894,59 @@ function confirmBooking() {
 function triggerSuccessAnimation() {
   const icon = document.querySelector('.success-icon');
   if (!icon) return;
-  icon.animate([
-    { transform: 'scale(0)', opacity: 0 },
-    { transform: 'scale(1.15)', opacity: 1 },
-    { transform: 'scale(1)', opacity: 1 }
-  ], { duration: 500, easing: 'cubic-bezier(0.34,1.56,0.64,1)' });
+  icon.animate(
+    [
+      { transform: 'scale(0)', opacity: 0 },
+      { transform: 'scale(1.15)', opacity: 1 },
+      { transform: 'scale(1)', opacity: 1 },
+    ],
+    { duration: 500, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+  );
 }
 
 // ─── PAYMENT SELECTION ───────────────────────────────────
 function selectPayment(el) {
-  document.querySelectorAll('.payment-opt').forEach(p => p.classList.remove('selected'));
+  document
+    .querySelectorAll('.payment-opt')
+    .forEach((p) => p.classList.remove('selected'));
   el.classList.add('selected');
 }
 
 // ─── RIDES FILTER ────────────────────────────────────────
 function filterRides(el, status) {
-  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active-tab'));
+  document
+    .querySelectorAll('.filter-tab')
+    .forEach((t) => t.classList.remove('active-tab'));
   el.classList.add('active-tab');
 
   const cards = document.querySelectorAll('.history-card');
-  cards.forEach(card => {
+  cards.forEach((card) => {
     if (status === 'all') {
       card.style.display = 'flex';
     } else {
       const cardStatus = card.dataset.status;
       const match =
-        (status === 'upcoming'  && cardStatus === 'in-progress') ||
-        (status === 'completed' && cardStatus === 'completed')   ||
+        (status === 'upcoming' && cardStatus === 'in-progress') ||
+        (status === 'completed' && cardStatus === 'completed') ||
         (status === 'cancelled' && cardStatus === 'cancelled');
       card.style.display = match ? 'flex' : 'none';
     }
     // Animate in
     if (card.style.display !== 'none') {
-      card.animate([
-        { opacity: 0, transform: 'translateY(8px)' },
-        { opacity: 1, transform: 'translateY(0)' }
-      ], { duration: 220, fill: 'forwards' });
+      card.animate(
+        [
+          { opacity: 0, transform: 'translateY(8px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: 220, fill: 'forwards' },
+      );
     }
   });
 }
 
 // ─── NOTIFICATIONS ───────────────────────────────────────
 function markAllRead() {
-  document.querySelectorAll('.notif-item.unread').forEach(n => {
+  document.querySelectorAll('.notif-item.unread').forEach((n) => {
     n.classList.remove('unread');
     const dot = n.querySelector('.notif-dot');
     if (dot) dot.remove();
@@ -880,7 +1006,7 @@ function startTrackingSimulation() {
 
 // ─── EXTRAS CHECKBOX INTERACTION ─────────────────────────
 function initExtrasInteraction() {
-  document.querySelectorAll('.extra-toggle input').forEach(checkbox => {
+  document.querySelectorAll('.extra-toggle input').forEach((checkbox) => {
     checkbox.addEventListener('change', () => {
       updateFareSummary();
     });
@@ -891,29 +1017,39 @@ function initExtrasInteraction() {
 let touchStartX = 0;
 let touchStartY = 0;
 
-document.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
-}, { passive: true });
+document.addEventListener(
+  'touchstart',
+  (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  },
+  { passive: true },
+);
 
-document.addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  const dy = e.changedTouches[0].clientY - touchStartY;
-  const absDx = Math.abs(dx);
-  const absDy = Math.abs(dy);
+document.addEventListener(
+  'touchend',
+  (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
 
-  // Only trigger for horizontal swipes (not scrolls)
-  if (absDx > 60 && absDx > absDy * 1.5) {
-    if (dx > 0) {
-      // Swipe right = go back
-      const backBtn = document.querySelector(`#${state.currentScreen} .back-btn`);
-      if (backBtn) goBack();
+    // Only trigger for horizontal swipes (not scrolls)
+    if (absDx > 60 && absDx > absDy * 1.5) {
+      if (dx > 0) {
+        // Swipe right = go back
+        const backBtn = document.querySelector(
+          `#${state.currentScreen} .back-btn`,
+        );
+        if (backBtn) goBack();
+      }
     }
-  }
-}, { passive: true });
+  },
+  { passive: true },
+);
 
 // ─── KEYBOARD: ENTER KEY ON FORMS ────────────────────────
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const screen = state.currentScreen;
     if (screen === 'register') registerUser();
@@ -930,21 +1066,29 @@ document.addEventListener('keydown', e => {
 
 // ─── SMOOTH SCROLL REVEAL ────────────────────────────────
 function initScrollReveal() {
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.animate([
-          { opacity: 0, transform: 'translateY(16px)' },
-          { opacity: 1, transform: 'translateY(0)' }
-        ], { duration: 360, fill: 'forwards', easing: 'ease-out' });
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.1 });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.animate(
+            [
+              { opacity: 0, transform: 'translateY(16px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: 360, fill: 'forwards', easing: 'ease-out' },
+          );
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
 
-  document.querySelectorAll(
-    '.hero-card, .fleet-card, .ride-card, .history-card, .vehicle-option, .book-step, .promo-banner'
-  ).forEach(el => observer.observe(el));
+  document
+    .querySelectorAll(
+      '.hero-card, .fleet-card, .ride-card, .history-card, .vehicle-option, .book-step, .promo-banner',
+    )
+    .forEach((el) => observer.observe(el));
 }
 
 // ─── CORDOVA DEVICE READY ────────────────────────────────
@@ -998,20 +1142,29 @@ function bootApp() {
   // ── Entry animation ───────────────────────────────────
   const splashContent = document.querySelector('.splash-content');
   if (splashContent) {
-    splashContent.animate([
-      { opacity: 0, transform: 'translateY(20px)' },
-      { opacity: 1, transform: 'translateY(0)' }
-    ], { duration: 800, delay: 200, fill: 'forwards', easing: 'ease-out' });
+    splashContent.animate(
+      [
+        { opacity: 0, transform: 'translateY(20px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: 800, delay: 200, fill: 'forwards', easing: 'ease-out' },
+    );
   }
   const splashFooter = document.querySelector('.splash-footer');
   if (splashFooter) {
-    splashFooter.animate([
-      { opacity: 0, transform: 'translateY(20px)' },
-      { opacity: 1, transform: 'translateY(0)' }
-    ], { duration: 600, delay: 700, fill: 'forwards', easing: 'ease-out' });
+    splashFooter.animate(
+      [
+        { opacity: 0, transform: 'translateY(20px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: 600, delay: 700, fill: 'forwards', easing: 'ease-out' },
+    );
   }
 
-  console.log('%cSIPHIKA CHAUFFEUR ✦', 'color:#C9A84C;font-size:20px;font-weight:bold;');
+  console.log(
+    '%cSIPHIKA CHAUFFEUR ✦',
+    'color:#C9A84C;font-size:20px;font-weight:bold;',
+  );
   console.log('%cArrive in Excellence', 'color:#8A8580;font-size:12px;');
 }
 
@@ -1029,14 +1182,19 @@ function onBackButton(e) {
   e.preventDefault();
   const noExitScreens = ['home', 'onboard-1', 'onboard-2', 'onboard-3'];
 
-  if (state.history.length <= 1 || noExitScreens.includes(state.currentScreen)) {
+  if (
+    state.history.length <= 1 ||
+    noExitScreens.includes(state.currentScreen)
+  ) {
     // Show a "press again to exit" toast, then exit on second press
     if (state._backPressedOnce) {
       if (navigator.app) navigator.app.exitApp();
     } else {
       state._backPressedOnce = true;
       showToast('Press back again to exit');
-      setTimeout(() => { state._backPressedOnce = false; }, 2000);
+      setTimeout(() => {
+        state._backPressedOnce = false;
+      }, 2000);
     }
   } else {
     goBack();
@@ -1058,12 +1216,12 @@ function initNetworkMonitor() {
 
     if (typeof Connection !== 'undefined') {
       // Cordova WebView — use the plugin's typed constant
-      offline = (navigator.connection.type === Connection.NONE);
+      offline = navigator.connection.type === Connection.NONE;
     } else {
       // Browser fallback — 'none' is the string value when offline,
       // or check navigator.onLine as a final safety net
       const type = navigator.connection.type;
-      offline = (type === 'none') || (!navigator.onLine);
+      offline = type === 'none' || !navigator.onLine;
     }
 
     let banner = document.getElementById('offline-banner');
@@ -1072,19 +1230,20 @@ function initNetworkMonitor() {
       if (!banner) {
         banner = document.createElement('div');
         banner.id = 'offline-banner';
-        banner.innerHTML = '📡 No internet connection — map & booking unavailable';
+        banner.innerHTML =
+          '📡 No internet connection — map & booking unavailable';
         Object.assign(banner.style, {
-          position:        'fixed',
-          top:             '0',
-          left:            '0',
-          right:           '0',
-          background:      'rgba(200,75,75,0.92)',
-          color:           '#fff',
-          fontSize:        '12px',
-          padding:         'calc(10px + var(--safe-top, 0px)) 16px 10px',
-          textAlign:       'center',
-          zIndex:          '9999',
-          backdropFilter:  'blur(6px)',
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          right: '0',
+          background: 'rgba(200,75,75,0.92)',
+          color: '#fff',
+          fontSize: '12px',
+          padding: 'calc(10px + var(--safe-top, 0px)) 16px 10px',
+          textAlign: 'center',
+          zIndex: '9999',
+          backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
         });
         document.body.appendChild(banner);
@@ -1095,7 +1254,7 @@ function initNetworkMonitor() {
   }
 
   document.addEventListener('offline', updateNetworkUI, false);
-  document.addEventListener('online',  updateNetworkUI, false);
+  document.addEventListener('online', updateNetworkUI, false);
   updateNetworkUI(); // check immediately on boot
 }
 
@@ -1116,12 +1275,12 @@ function applySafeAreaInsets() {
   if (hasEnv) {
     // CSS env() is supported — the stylesheet already handles this via
     // the padding-bottom on .bottom-nav and padding-top on .sbar
-    root.style.setProperty('--safe-top',    'env(safe-area-inset-top)');
+    root.style.setProperty('--safe-top', 'env(safe-area-inset-top)');
     root.style.setProperty('--safe-bottom', 'env(safe-area-inset-bottom)');
   } else {
     // Android older fallback — estimate from screen dimensions
     const statusH = window.screen.height - window.innerHeight > 24 ? 24 : 0;
-    root.style.setProperty('--safe-top',    statusH + 'px');
+    root.style.setProperty('--safe-top', statusH + 'px');
     root.style.setProperty('--safe-bottom', '0px');
   }
 }
@@ -1131,37 +1290,50 @@ function applySafeAreaInsets() {
 // Uses cordova-plugin-geolocation (falls back to browser API).
 function useMyLocation() {
   const btn = document.getElementById('geolocate-btn');
-  if (btn) { btn.textContent = '📡'; btn.disabled = true; }
+  if (btn) {
+    btn.textContent = '📡';
+    btn.disabled = true;
+  }
 
   const success = (position) => {
     const { latitude, longitude } = position.coords;
-    if (btn) { btn.textContent = '📍'; btn.disabled = false; }
+    if (btn) {
+      btn.textContent = '📍';
+      btn.disabled = false;
+    }
 
     // Reverse-geocode using Google Maps Geocoder
     if (window.google?.maps) {
       const geocoder = new google.maps.Geocoder();
-      geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          const addr = results[0].formatted_address;
-          const pickupInput = document.getElementById('book-pickup');
-          if (pickupInput) {
-            pickupInput.value = addr;
-            drawRoute();
-            showToast('📍 Location set');
+      geocoder.geocode(
+        { location: { lat: latitude, lng: longitude } },
+        (results, status) => {
+          if (status === 'OK' && results[0]) {
+            const addr = results[0].formatted_address;
+            const pickupInput = document.getElementById('book-pickup');
+            if (pickupInput) {
+              pickupInput.value = addr;
+              drawRoute();
+              showToast('📍 Location set');
+            }
+          } else {
+            showToast('Could not resolve address');
           }
-        } else {
-          showToast('Could not resolve address');
-        }
-      });
+        },
+      );
     } else {
       // Maps not loaded yet — just fill coordinates
       const pickupInput = document.getElementById('book-pickup');
-      if (pickupInput) pickupInput.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      if (pickupInput)
+        pickupInput.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     }
   };
 
   const error = (err) => {
-    if (btn) { btn.textContent = '📍'; btn.disabled = false; }
+    if (btn) {
+      btn.textContent = '📍';
+      btn.disabled = false;
+    }
     const msgs = {
       1: 'Location permission denied',
       2: 'Location unavailable',
@@ -1185,7 +1357,6 @@ function hapticConfirm() {
   }
 }
 
-
 // ─── HANDLE TRACKING SCREEN ──────────────────────────────
 const trackingObserver = new MutationObserver(() => {
   if (state.currentScreen === 'tracking') {
@@ -1197,19 +1368,19 @@ trackingObserver.observe(document.body, { attributes: true, subtree: true });
 // ─── EXPOSE FUNCTIONS TO GLOBAL SCOPE ────────────────────
 // Required because type="module" scopes functions away from
 // inline onclick="" handlers in HTML. Attach them to window.
-window.goTo           = goTo;
-window.goBack         = goBack;
-window.registerUser   = registerUser;
-window.selectFleet    = selectFleet;
-window.selectVehicle  = selectVehicle;
-window.setTripType    = setTripType;
+window.goTo = goTo;
+window.goBack = goBack;
+window.registerUser = registerUser;
+window.selectFleet = selectFleet;
+window.selectVehicle = selectVehicle;
+window.setTripType = setTripType;
 window.confirmBooking = confirmBooking;
-window.selectPayment  = selectPayment;
-window.filterRides    = filterRides;
-window.markAllRead    = markAllRead;
-window.schedule       = schedule;
-window.swapLocations  = swapLocations;
-window.drawRoute      = drawRoute;
-window.useMyLocation  = useMyLocation;
-window.hapticConfirm  = hapticConfirm;
-window.toggleTheme    = toggleTheme;
+window.selectPayment = selectPayment;
+window.filterRides = filterRides;
+window.markAllRead = markAllRead;
+window.schedule = schedule;
+window.swapLocations = swapLocations;
+window.drawRoute = drawRoute;
+window.useMyLocation = useMyLocation;
+window.hapticConfirm = hapticConfirm;
+window.toggleTheme = toggleTheme;

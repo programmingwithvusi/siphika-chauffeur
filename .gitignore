@@ -38,4 +38,8 @@ DerivedData/
 # Env / secrets — NEVER commit API keys
 .env
 .env.local
+.env.example
 .env.production
+
+# txt notes*.txt
+*.txt
