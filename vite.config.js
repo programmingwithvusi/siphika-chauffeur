@@ -2,9 +2,17 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = resolve(fileURLToPath(import.meta.url), '..');
+// Fix: __dirname is not available in ESM (import syntax).
+// Derive it from import.meta.url so resolve() works correctly
+// on all Node versions regardless of CJS/ESM detection.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = resolve(__filename, '..');
 
-// ─── Plugin: inject cordova.js loader post-build ──────────────────────────
+// ─── Vite plugin: inject cordova.js loader post-build ────────────────────
+// Appending via transformIndexHtml (order:'post') means Vite never sees
+// the cordova.js src during its own transform phase → no "can't be bundled"
+// warning. The loader guards on file:// so it is a no-op in the browser.
+// ─────────────────────────────────────────────────────────────────────────
 function injectCordovaLoader() {
   const script = [
     '<script>',
@@ -18,6 +26,7 @@ function injectCordovaLoader() {
     '}());',
     '</script>',
   ].join('');
+
   return {
     name: 'inject-cordova-loader',
     transformIndexHtml: {
@@ -54,11 +63,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     root: 'src',
-    base: './',
+    base: './', // relative paths — mandatory for file:// on-device
     plugins: [injectMapsKey(env), injectCordovaLoader()],
+
     build: {
       outDir: resolve(__dirname, 'www'),
       emptyOutDir: true,
+
       rollupOptions: {
         input: resolve(__dirname, 'src/index.html'),
         external: ['cordova'],
@@ -68,14 +79,24 @@ export default defineConfig(({ mode }) => {
           assetFileNames: 'assets/[name][extname]',
         },
       },
+
       minify: 'terser',
       terserOptions: {
         compress: { drop_console: false },
         mangle: { keep_fnames: true },
       },
+
+      // Chrome 90 = Android WebView on API 24+
+      // Safari 15 = iOS 15+ WKWebView
       target: ['chrome90', 'safari15'],
     },
+
     optimizeDeps: { exclude: ['cordova'] },
-    server: { port: 5173, open: true, host: '0.0.0.0' },
+
+    server: {
+      port: 5173,
+      open: true,
+      host: '0.0.0.0', // accessible from Android emulator via 10.0.2.2
+    },
   };
 });

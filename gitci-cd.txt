@@ -6,6 +6,8 @@ git remote add origin https://github.com/programmingwithvusi/siphika-chauffeur.g
 git push -u origin main
 
 Adding to existing repository
+git add .
+git commit -m "first commit"
 git remote add origin https://github.com/programmingwithvusi/siphika-chauffeur.git
 git branch -M main
 git push -u origin main
@@ -31,3 +33,10 @@ Remove-Item -Recurse -Force www\
 npm run build        # ← substitutes key at build time
 cordova prepare
 npm run android
+
+
+cordova clean
+cordova platform add android
+cordova platform rm android
+cordova platform add browser
+cordova platform rm browser

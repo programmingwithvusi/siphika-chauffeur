@@ -21,7 +21,7 @@
     "prepare": "cordova prepare"
   },
   "devDependencies": {
-    "cordova-android": "^15.0.0",
+    "cordova-android": "^14.0.1",
     "cordova-browser": "^7.0.0",
     "sharp": "^0.34.5",
     "terser": "^5.0.0",
@@ -38,6 +38,9 @@
       "cordova-plugin-vibration": {},
       "cordova-plugin-file": {}
     },
-    "platforms": []
+    "platforms": [
+      "browser",
+      "android"
+    ]
   }
 }
