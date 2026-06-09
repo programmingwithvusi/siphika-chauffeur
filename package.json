@@ -14,6 +14,7 @@
     "android": "npm run build && cordova run android",
     "android:dev": "npm run build && cordova run android --device",
     "android:rel": "npm run build && cordova build android --release",
+    "browser": "npm run build && cordova run browser",
     "ios": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
     "ios:dev": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
     "ios:rel": "node -e \"console.error('iOS builds require macOS + Xcode. Run this on a Mac.');process.exit(1)\"",
