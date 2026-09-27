@@ -54,7 +54,7 @@ function injectMapsKey(env) {
     name: 'inject-maps-key',
     transformIndexHtml: {
       order: 'pre',
-      handler: (html) => html.replace(/_MAPS_KEY_/g, key || 'MISSING_KEY'),
+      handler: (html) => html.replace(/__MAPS_KEY__/g, key || 'MISSING_KEY'),
     },
   };
 }
@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     root: 'src',
+    envDir: __dirname, // .env files live in the project root, not src/
     base: './', // relative paths — mandatory for file:// on-device
     plugins: [injectMapsKey(env), injectCordovaLoader()],
 
@@ -72,9 +73,9 @@ export default defineConfig(({ mode }) => {
 
       rollupOptions: {
         input: resolve(__dirname, 'src/index.html'),
-        external: ['cordova'],
+        external: ['cordova.js'],
         output: {
-          entryFileNames: 'assets/app.js',
+          entryFileNames: 'assets/main.js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name][extname]',
         },

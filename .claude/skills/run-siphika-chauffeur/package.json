@@ -1,0 +1,10 @@
+{
+  "name": "run-siphika-chauffeur-driver",
+  "private": true,
+  "type": "module",
+  "description": "Isolated deps for the run-siphika-chauffeur skill's Playwright driver. Kept separate from the app's own package.json since the app itself doesn't need a browser-automation dependency.",
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "firebase-admin": "^13.0.0"
+  }
+}

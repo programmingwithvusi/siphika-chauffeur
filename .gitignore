@@ -10,6 +10,7 @@
 # Node modules
 /node_modules/
 /src/node_modules/
+/functions/node_modules/
 
 # Vite cache
 /.vite/
@@ -41,6 +42,17 @@ DerivedData/
 .env.example
 .env.production
 
+# Firebase native config (contains API keys)
+google-services.json
+GoogleService-Info.plist
+
+# Firebase service-account keys (full admin access — NEVER commit) and CLI cache
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+/.firebase/
+
 # txt notes*.txt
 *.txt
 
+# // instruction docs
+/Docs

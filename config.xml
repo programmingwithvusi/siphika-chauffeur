@@ -2,7 +2,7 @@
 <widget id="za.co.siphika.chauffeur" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>Siphika</name>
     <description>Siphika Chauffeur — Premium ride booking for South Africa</description>
-    <author email="dev@siphika.co.za" href="https://siphika.co.za">
+    <author email="programmingwithvusi.gmail.com" href="https://siphika.co.za">
     Siphika Development Team
   </author>
     <content src="index.html" />
@@ -112,4 +112,5 @@
     <plugin name="cordova-plugin-inappbrowser" spec="^6.0.0" />
     <plugin name="cordova-plugin-vibration" spec="^3.1.1" />
     <plugin name="cordova-plugin-file" spec="^8.0.0" />
+    <hook type="before_prepare" src="hooks/before_prepare/010-fix-platform-esm.cjs" />
 </widget>

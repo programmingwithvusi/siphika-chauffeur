@@ -39,7 +39,8 @@
           default-src 'self' data: gap: cdvfile: file:;
           script-src  'self' 'unsafe-inline' 'unsafe-eval'
                       https://maps.googleapis.com
-                      https://maps.google.com;
+                      https://maps.google.com
+                      https://*.googleapis.com;
           style-src   'self' 'unsafe-inline'
                       https://fonts.googleapis.com
                       https://maps.googleapis.com;
@@ -53,10 +54,16 @@
                       https://maps.gstatic.com;
           connect-src 'self'
                       https://maps.googleapis.com
-                      https://*.googleapis.com
                       https://routes.googleapis.com
+                      https://*.googleapis.com
+                      https://*.firebaseio.com
+                      https://firestore.googleapis.com
+                      https://identitytoolkit.googleapis.com
+                      https://securetoken.googleapis.com
+                      https://*.cloudfunctions.net
                       https://images.unsplash.com;
           frame-src   'none';
+          worker-src  'self' blob:;
         "
     />
 
@@ -71,31 +78,6 @@
     />
 
     <link rel="stylesheet" href="./style.css" />
-
-    <!--
-    Google Maps JS API — loaded WITHOUT a callback parameter.
-    Using callback=initGoogleMaps here causes:
-      "initGoogleMaps is not a function"
-    because the Maps API resolves before app.js (type="module") has
-    executed and registered window.initGoogleMaps.
-
-    Libraries:
-      places  — Autocomplete on pickup/destination inputs
-      routes  — Routes API v2 (replaces legacy Directions API)
-      marker  — AdvancedMarkerElement (replaces deprecated Marker)
-
-    Instead we use loading=async with no callback. app.js waits for
-    the Maps API promise via google.maps.importLibrary() after deviceready.
-
-    APIs to enable in Google Cloud Console:
-      ✅ Maps JavaScript API
-      ✅ Routes API          (NOT the legacy "Directions API")
-      ✅ Places API (New)
-  -->
-    <script
-      async
-      src="https://maps.googleapis.com/maps/api/js?key=_MAPS_KEY_&libraries=places&callback=initMapsDirect&loading=async"
-    ></script>
 
     <!--
     cordova.js is intentionally NOT loaded here.
@@ -167,6 +149,43 @@
           Begin Your Journey
         </button>
         <button class="btn-ghost" onclick="goTo('home')">Sign In</button>
+        <div
+          style="display: flex; align-items: center; gap: 10px; margin: 14px 0"
+        >
+          <div style="flex: 1; height: 1px; background: var(--border-lt)"></div>
+          <span style="font-size: 11px; color: var(--text-dim)">OR</span>
+          <div style="flex: 1; height: 1px; background: var(--border-lt)"></div>
+        </div>
+        <button
+          class="btn-ghost"
+          onclick="doGoogleSignIn()"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          "
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
+          </svg>
+          Continue with Google
+        </button>
         <button
           class="theme-toggle-btn"
           onclick="toggleTheme()"
@@ -291,9 +310,14 @@
             id="reg-pass"
           />
         </div>
-        <button class="btn-primary" onclick="registerUser()">
+        <div class="input-group">
+          <label>Referral Code (optional)</label>
+          <input type="text" placeholder="e.g. AB12CD34" id="reg-referral" />
+        </div>
+        <button class="btn-primary" onclick="doRegister()">
           Create Account
         </button>
+
         <p class="form-switch">
           Already registered? <span onclick="goTo('login')">Sign in here</span>
         </p>
@@ -305,20 +329,70 @@
       <div class="form-header">
         <button class="back-btn" onclick="goTo('splash')">←</button>
         <span class="logo-sm">SIPHIKA</span>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
       </div>
       <div class="form-body">
         <h2>Welcome Back</h2>
         <p class="form-sub">Your chauffeur awaits</p>
         <div class="input-group">
           <label>Email Address</label>
-          <input type="email" placeholder="you@example.com" />
+          <!-- id="l-email" required — auth.module.js reads this -->
+          <input type="email" placeholder="you@example.com" id="l-email" />
         </div>
         <div class="input-group">
           <label>Password</label>
-          <input type="password" placeholder="••••••••" />
+          <!-- id="l-pass" required — auth.module.js reads this -->
+          <input type="password" placeholder="••••••••" id="l-pass" />
         </div>
         <p class="forgot-link">Forgot password?</p>
-        <button class="btn-primary" onclick="goTo('home')">Sign In</button>
+        <!-- Calls real Firebase auth — NOT goTo('home') -->
+        <button class="btn-primary" onclick="doLogin()">Sign In</button>
+
+        <!-- Google sign-in divider -->
+        <div
+          style="display: flex; align-items: center; gap: 10px; margin: 14px 0"
+        >
+          <div style="flex: 1; height: 1px; background: var(--border-lt)"></div>
+          <span style="font-size: 11px; color: var(--text-dim)">OR</span>
+          <div style="flex: 1; height: 1px; background: var(--border-lt)"></div>
+        </div>
+        <button
+          class="btn-ghost"
+          onclick="doGoogleSignIn()"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          "
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
+          </svg>
+          Continue with Google
+        </button>
+
         <p class="form-switch">
           New to Siphika? <span onclick="goTo('register')">Register</span>
         </p>
@@ -329,10 +403,10 @@
     <div id="home" class="screen app-screen">
       <div class="app-topbar">
         <div class="topbar-left">
-          <div class="avatar" onclick="goTo('profile')">TN</div>
+          <div class="avatar" data-bind="initials" onclick="goTo('profile')"></div>
           <div>
             <p class="greeting">Good morning,</p>
-            <p class="user-name">Thabo Nkosi</p>
+            <p class="user-name" data-bind="user.name"></p>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px">
@@ -355,7 +429,7 @@
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
             </svg>
-            <span class="notif-badge">3</span>
+            <span class="notif-badge" data-bind="notif.count" hidden></span>
           </button>
         </div>
       </div>
@@ -386,7 +460,7 @@
             <button class="btn-primary full-w" onclick="goTo('book')">
               Book Now
             </button>
-            <button class="btn-outline" onclick="goTo('schedule')">
+            <button class="btn-outline" onclick="schedule()">
               Schedule
             </button>
           </div>
@@ -404,22 +478,22 @@
           >
             <div class="fleet-img">🚗</div>
             <p class="fleet-name">Executive</p>
-            <p class="fleet-price">From R450</p>
+            <p class="fleet-price" data-price="Executive Sedan"></p>
           </div>
           <div class="fleet-card" onclick="selectFleet(this, 'Business Class')">
             <div class="fleet-img">🚙</div>
             <p class="fleet-name">Business</p>
-            <p class="fleet-price">From R680</p>
+            <p class="fleet-price" data-price="Business Class"></p>
           </div>
           <div class="fleet-card" onclick="selectFleet(this, 'Luxury SUV')">
             <div class="fleet-img">🛻</div>
             <p class="fleet-name">Luxury SUV</p>
-            <p class="fleet-price">From R950</p>
+            <p class="fleet-price" data-price="Luxury SUV"></p>
           </div>
           <div class="fleet-card" onclick="selectFleet(this, 'Stretch Limo')">
             <div class="fleet-img">🚐</div>
             <p class="fleet-name">Limousine</p>
-            <p class="fleet-price">From R1,800</p>
+            <p class="fleet-price" data-price="Stretch Limousine"></p>
           </div>
         </div>
 
@@ -428,39 +502,8 @@
           <h3>Recent Rides</h3>
           <span onclick="goTo('rides')">View all</span>
         </div>
-        <div class="ride-card" onclick="goTo('tracking')">
-          <div class="ride-status-dot active"></div>
-          <div class="ride-info">
-            <p class="ride-from">OR Tambo International</p>
-            <p class="ride-arrow">→</p>
-            <p class="ride-to">Sandton City, JHB</p>
-          </div>
-          <div class="ride-meta">
-            <span class="ride-badge in-progress">In Progress</span>
-            <p class="ride-price">R620</p>
-          </div>
-        </div>
-        <div class="ride-card" onclick="goTo('rides')">
-          <div class="ride-status-dot done"></div>
-          <div class="ride-info">
-            <p class="ride-from">Rosebank Mall</p>
-            <p class="ride-arrow">→</p>
-            <p class="ride-to">Melrose Arch</p>
-          </div>
-          <div class="ride-meta">
-            <span class="ride-badge completed">Completed</span>
-            <p class="ride-price">R280</p>
-          </div>
-        </div>
-        <!-- Promo Banner -->
-        <div class="promo-banner">
-          <div class="promo-text">
-            <p class="promo-title">First Airport Ride Free</p>
-            <p class="promo-sub">
-              Use code <strong>SIPHIKA1</strong> at checkout
-            </p>
-          </div>
-          <div class="promo-icon">✈️</div>
+        <div id="recent-rides">
+          <p class="empty-state">No rides yet. Book your first ride above.</p>
         </div>
       </div>
 
@@ -552,7 +595,6 @@
                     type="text"
                     placeholder="Enter address or landmark"
                     id="book-pickup"
-                    value="OR Tambo International Airport"
                     style="flex: 1"
                   />
                   <button
@@ -571,7 +613,6 @@
                   type="text"
                   placeholder="Where are you going?"
                   id="book-dest"
-                  value="Sandton Convention Centre"
                 />
               </div>
               <button
@@ -627,7 +668,7 @@
             <div class="route-info-item">
               <span class="route-info-icon">💰</span>
               <div>
-                <p class="route-info-val" id="route-fare">R530</p>
+                <p class="route-info-val" id="route-fare">—</p>
                 <p class="route-info-label">Est. fare</p>
               </div>
             </div>
@@ -677,47 +718,47 @@
             <div class="vehicle-list">
               <div
                 class="vehicle-option selected"
-                onclick="selectVehicle(this, 'Executive Sedan', 'R450')"
+                onclick="selectVehicle(this, 'Executive Sedan')"
               >
                 <div class="vehicle-icon">🚗</div>
                 <div class="vehicle-details">
                   <p class="vehicle-name">Executive Sedan</p>
                   <p class="vehicle-desc">Mercedes-Benz E-Class · 3 pax</p>
                 </div>
-                <p class="vehicle-price">R450</p>
+                <p class="vehicle-price" data-price="Executive Sedan"></p>
               </div>
               <div
                 class="vehicle-option"
-                onclick="selectVehicle(this, 'Business Class', 'R680')"
+                onclick="selectVehicle(this, 'Business Class')"
               >
                 <div class="vehicle-icon">🚙</div>
                 <div class="vehicle-details">
                   <p class="vehicle-name">Business Class</p>
                   <p class="vehicle-desc">BMW 7 Series · 3 pax</p>
                 </div>
-                <p class="vehicle-price">R680</p>
+                <p class="vehicle-price" data-price="Business Class"></p>
               </div>
               <div
                 class="vehicle-option"
-                onclick="selectVehicle(this, 'Luxury SUV', 'R950')"
+                onclick="selectVehicle(this, 'Luxury SUV')"
               >
                 <div class="vehicle-icon">🛻</div>
                 <div class="vehicle-details">
                   <p class="vehicle-name">Luxury SUV</p>
                   <p class="vehicle-desc">Range Rover · 6 pax</p>
                 </div>
-                <p class="vehicle-price">R950</p>
+                <p class="vehicle-price" data-price="Luxury SUV"></p>
               </div>
               <div
                 class="vehicle-option"
-                onclick="selectVehicle(this, 'Stretch Limousine', 'R1,800')"
+                onclick="selectVehicle(this, 'Stretch Limousine')"
               >
                 <div class="vehicle-icon">🚐</div>
                 <div class="vehicle-details">
                   <p class="vehicle-name">Stretch Limousine</p>
                   <p class="vehicle-desc">Lincoln Town Car · 10 pax</p>
                 </div>
-                <p class="vehicle-price">R1,800</p>
+                <p class="vehicle-price" data-price="Stretch Limousine"></p>
               </div>
             </div>
           </div>
@@ -729,27 +770,28 @@
             <h4>Special Requests</h4>
             <div class="extras-grid">
               <label class="extra-toggle"
-                ><input type="checkbox" /><span>🍾 Champagne</span></label
+                ><input type="checkbox" data-extra="Champagne" /><span>🍾 Champagne</span></label
               >
               <label class="extra-toggle"
-                ><input type="checkbox" /><span>💐 Flowers</span></label
+                ><input type="checkbox" data-extra="Flowers" /><span>💐 Flowers</span></label
               >
               <label class="extra-toggle"
-                ><input type="checkbox" checked /><span>🌐 WiFi</span></label
+                ><input type="checkbox" data-extra="WiFi" checked /><span>🌐 WiFi</span></label
               >
               <label class="extra-toggle"
-                ><input type="checkbox" /><span>📰 Newspaper</span></label
+                ><input type="checkbox" data-extra="Newspaper" /><span>📰 Newspaper</span></label
               >
               <label class="extra-toggle"
-                ><input type="checkbox" /><span>❄️ Cold Drinks</span></label
+                ><input type="checkbox" data-extra="Cold Drinks" /><span>❄️ Cold Drinks</span></label
               >
               <label class="extra-toggle"
-                ><input type="checkbox" /><span>🎵 Music</span></label
+                ><input type="checkbox" data-extra="Music" /><span>🎵 Music</span></label
               >
             </div>
             <div class="input-group" style="margin-top: 12px">
               <label>Additional Notes</label>
               <textarea
+                id="book-notes"
                 placeholder="e.g. Flight number, specific instructions..."
               ></textarea>
             </div>
@@ -757,13 +799,15 @@
         </div>
 
         <div class="fare-summary">
-          <div class="fare-row"><span>Base fare</span><span>R450</span></div>
           <div class="fare-row">
-            <span>Airport surcharge</span><span>R80</span>
+            <span>Base fare</span><span id="fare-base">—</span>
+          </div>
+          <div class="fare-row">
+            <span>Airport surcharge</span><span id="fare-surcharge">—</span>
           </div>
           <div class="fare-row"><span>Extras</span><span>R0</span></div>
           <div class="fare-row total">
-            <span>Total</span><span id="fare-total">R530</span>
+            <span>Total</span><span id="fare-total">—</span>
           </div>
         </div>
 
@@ -850,45 +894,41 @@
         <div class="confirm-vehicle-card">
           <div class="confirm-car-icon">🚗</div>
           <div>
-            <p class="confirm-vehicle-name">Executive Sedan</p>
-            <p class="confirm-chauffeur">Chauffeur: James Mokoena ⭐ 4.9</p>
+            <p class="confirm-vehicle-name" data-conf="vehicle"></p>
+            <p class="confirm-chauffeur">Chauffeur assigned after booking</p>
           </div>
-          <div class="conf-eta">ETA <strong>8 min</strong></div>
         </div>
 
         <div class="confirm-details">
           <div class="conf-row">
             <span class="conf-label">📍 Pickup</span>
-            <span class="conf-value">OR Tambo International Airport</span>
+            <span class="conf-value" data-conf="pickup">—</span>
           </div>
           <div class="conf-row">
             <span class="conf-label">🏁 Drop-off</span>
-            <span class="conf-value">Sandton Convention Centre</span>
+            <span class="conf-value" data-conf="destination">—</span>
           </div>
           <div class="conf-row">
             <span class="conf-label">📅 Date & Time</span>
-            <span class="conf-value" id="conf-dt">Today, 08:00</span>
+            <span class="conf-value" id="conf-dt">—</span>
           </div>
           <div class="conf-row">
             <span class="conf-label">🚘 Vehicle</span>
-            <span class="conf-value">Executive Sedan</span>
+            <span class="conf-value" data-conf="vehicle">—</span>
           </div>
           <div class="conf-row">
             <span class="conf-label">🌐 Extras</span>
-            <span class="conf-value">WiFi</span>
+            <span class="conf-value" data-conf="extras">None</span>
           </div>
         </div>
 
         <div class="payment-section">
           <h4>Payment Method</h4>
           <div class="payment-options">
-            <div class="payment-opt selected" onclick="selectPayment(this)">
-              <span>💳</span><span>Visa •••• 4242</span>
+            <div class="payment-opt selected" data-method="online" onclick="selectPayment(this)">
+              <span>💳</span><span>Pay online</span>
             </div>
-            <div class="payment-opt" onclick="selectPayment(this)">
-              <span>📱</span><span>SnapScan</span>
-            </div>
-            <div class="payment-opt" onclick="selectPayment(this)">
+            <div class="payment-opt" data-method="cash" onclick="selectPayment(this)">
               <span>💵</span><span>Cash</span>
             </div>
           </div>
@@ -896,7 +936,7 @@
 
         <div class="fare-summary">
           <div class="fare-row total">
-            <span>Total Amount</span><span>R530</span>
+            <span>Total Amount</span><span data-conf="total">—</span>
           </div>
         </div>
 
@@ -905,7 +945,7 @@
           onclick="confirmBooking()"
           style="margin-bottom: 100px"
         >
-          Confirm & Pay R530
+          Confirm & Pay
         </button>
       </div>
 
@@ -974,9 +1014,8 @@
         <div class="success-icon">✓</div>
       </div>
       <h2 class="success-title">Booking Confirmed!</h2>
-      <p class="success-sub">Your chauffeur James is on the way</p>
-      <div class="booking-ref">Ref: <strong>SPK-20241215-0042</strong></div>
-      <div class="eta-chip">Arriving in <strong>8 minutes</strong> 🚗</div>
+      <p class="success-sub">Your chauffeur will be assigned shortly</p>
+      <div class="booking-ref">Ref: <strong data-bind="booking.ref"></strong></div>
       <button
         class="btn-primary"
         onclick="goTo('tracking')"
@@ -999,27 +1038,16 @@
         <div class="map-car">🚗</div>
         <div class="map-overlay-top">
           <button class="back-btn white" onclick="goBack()">←</button>
-          <div class="map-eta-chip">8 min away</div>
+          <div class="map-eta-chip">Locating…</div>
         </div>
       </div>
       <div class="tracking-panel">
         <div class="track-handle"></div>
         <div class="chauffeur-row">
-          <div class="chauffeur-avatar">JM</div>
+          <div class="chauffeur-avatar">🚗</div>
           <div class="chauffeur-info">
-            <p class="chauffeur-name">James Mokoena</p>
-            <p class="chauffeur-car">Mercedes E220 · GP 123-456</p>
-            <div class="star-rating">
-              ⭐⭐⭐⭐⭐ <span>4.9 (238 trips)</span>
-            </div>
-          </div>
-          <div class="chauffeur-actions">
-            <button class="icon-btn" onclick="alert('Calling James...')">
-              📞
-            </button>
-            <button class="icon-btn" onclick="alert('Opening chat...')">
-              💬
-            </button>
+            <p class="chauffeur-name">Assigning chauffeur…</p>
+            <p class="chauffeur-car"></p>
           </div>
         </div>
         <div class="track-route">
@@ -1027,7 +1055,7 @@
             <div class="track-dot gold"></div>
             <div>
               <p class="track-label">Pickup</p>
-              <p class="track-addr">OR Tambo International Airport</p>
+              <p class="track-addr" data-track="pickup">—</p>
             </div>
           </div>
           <div class="track-line"></div>
@@ -1035,27 +1063,27 @@
             <div class="track-dot white"></div>
             <div>
               <p class="track-label">Drop-off</p>
-              <p class="track-addr">Sandton Convention Centre</p>
+              <p class="track-addr" data-track="destination">—</p>
             </div>
           </div>
         </div>
         <div class="track-footer">
           <div class="track-stat">
-            <p>~32 km</p>
+            <p data-track="distance">—</p>
             <span>Distance</span>
           </div>
           <div class="track-stat">
-            <p>~28 min</p>
-            <span>Duration</span>
+            <p data-track="eta">—</p>
+            <span>ETA</span>
           </div>
           <div class="track-stat">
-            <p>R530</p>
+            <p data-track="fare">—</p>
             <span>Fare</span>
           </div>
         </div>
         <button
           class="btn-danger"
-          onclick="if (confirm('Cancel ride?')) goTo('home');"
+          onclick="cancelRide()"
         >
           Cancel Ride
         </button>
@@ -1095,57 +1123,7 @@
         </div>
 
         <div class="rides-list" id="rides-list">
-          <div class="history-card" data-status="in-progress">
-            <div class="hc-top">
-              <span class="ride-badge in-progress">In Progress</span
-              ><span class="hc-date">Today</span>
-            </div>
-            <div class="hc-route">OR Tambo Airport → Sandton City</div>
-            <div class="hc-bottom">
-              <span class="hc-car">🚗 Executive Sedan</span
-              ><span class="hc-price">R620</span>
-            </div>
-            <button class="btn-outline sm" onclick="goTo('tracking')">
-              Track
-            </button>
-          </div>
-          <div class="history-card" data-status="completed">
-            <div class="hc-top">
-              <span class="ride-badge completed">Completed</span
-              ><span class="hc-date">12 Dec 2024</span>
-            </div>
-            <div class="hc-route">Rosebank Mall → Melrose Arch</div>
-            <div class="hc-bottom">
-              <span class="hc-car">🚗 Executive Sedan</span
-              ><span class="hc-price">R280</span>
-            </div>
-            <button class="btn-outline sm" onclick="alert('Rating submitted!')">
-              Rate Ride ⭐
-            </button>
-          </div>
-          <div class="history-card" data-status="completed">
-            <div class="hc-top">
-              <span class="ride-badge completed">Completed</span
-              ><span class="hc-date">8 Dec 2024</span>
-            </div>
-            <div class="hc-route">Sandton Drive → CSIR Pretoria</div>
-            <div class="hc-bottom">
-              <span class="hc-car">🛻 Luxury SUV</span
-              ><span class="hc-price">R1,120</span>
-            </div>
-            <button class="btn-outline sm">Receipt</button>
-          </div>
-          <div class="history-card" data-status="cancelled">
-            <div class="hc-top">
-              <span class="ride-badge cancelled">Cancelled</span
-              ><span class="hc-date">2 Dec 2024</span>
-            </div>
-            <div class="hc-route">Hyde Park → Lanseria Airport</div>
-            <div class="hc-bottom">
-              <span class="hc-car">🚙 Business Class</span
-              ><span class="hc-price">R0</span>
-            </div>
-          </div>
+          <p class="empty-state">No rides yet.</p>
         </div>
       </div>
       <nav class="bottom-nav">
@@ -1209,26 +1187,28 @@
     <div id="profile" class="screen app-screen">
       <div class="profile-hero">
         <div class="grain"></div>
-        <div class="profile-avatar-lg">TN</div>
-        <h2 class="profile-name">Thabo Nkosi</h2>
-        <p class="profile-email">thabo.nkosi@email.com</p>
+        <div class="profile-avatar-lg" data-bind="initials"></div>
+        <h2 class="profile-name" data-bind="user.name"></h2>
+        <p class="profile-email" data-bind="user.email"></p>
         <div class="profile-tier">
-          <span class="tier-badge">✦ Gold Member</span>
+          <span class="tier-badge" data-bind="user.tier"></span>
         </div>
       </div>
       <div class="profile-stats">
-        <div class="stat"><strong>24</strong><span>Rides</span></div>
+        <div class="stat">
+          <strong data-bind="user.totalRides">0</strong><span>Rides</span>
+        </div>
         <div class="stat-div"></div>
-        <div class="stat"><strong>4.8</strong><span>Rating</span></div>
-        <div class="stat-div"></div>
-        <div class="stat"><strong>R12k+</strong><span>Spent</span></div>
+        <div class="stat">
+          <strong data-bind="user.rating">—</strong><span>Rating</span>
+        </div>
       </div>
       <div class="profile-menu">
-        <button class="menu-item" onclick="alert('Edit profile')">
+        <button class="menu-item" onclick="goTo('edit-profile')">
           <span class="menu-icon">👤</span><span>Personal Information</span
           ><span class="menu-arrow">›</span>
         </button>
-        <button class="menu-item" onclick="alert('Manage payments')">
+        <button class="menu-item" onclick="goTo('payment-methods')">
           <span class="menu-icon">💳</span><span>Payment Methods</span
           ><span class="menu-arrow">›</span>
         </button>
@@ -1236,22 +1216,22 @@
           <span class="menu-icon">🔔</span><span>Notifications</span
           ><span class="menu-arrow">›</span>
         </button>
-        <button class="menu-item" onclick="alert('Favourite locations')">
+        <button class="menu-item" onclick="goTo('saved-locations')">
           <span class="menu-icon">📍</span><span>Saved Locations</span
           ><span class="menu-arrow">›</span>
         </button>
-        <button class="menu-item" onclick="alert('Refer a friend!')">
+        <button class="menu-item" onclick="goTo('refer')">
           <span class="menu-icon">🎁</span><span>Refer & Earn</span
           ><span class="menu-arrow new-badge">New ›</span>
         </button>
-        <button class="menu-item" onclick="alert('Support centre')">
+        <a
+          class="menu-item"
+          href="mailto:programmingwithvusi@gmail.com?subject=Siphika%20Chauffeur%20Support"
+        >
           <span class="menu-icon">💬</span><span>Help & Support</span
           ><span class="menu-arrow">›</span>
-        </button>
-        <button
-          class="menu-item danger"
-          onclick="if (confirm('Sign out?')) goTo('splash');"
-        >
+        </a>
+        <button class="menu-item danger" onclick="doSignOut()">
           <span class="menu-icon">🚪</span><span>Sign Out</span
           ><span class="menu-arrow">›</span>
         </button>
@@ -1313,6 +1293,121 @@
       </nav>
     </div>
 
+    <!-- ═══════════════════════════════════════════ EDIT PROFILE ═══ -->
+    <div id="edit-profile" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Personal Information</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="form-body edit-profile-scroll">
+        <div class="input-group">
+          <label>Full Name</label>
+          <input type="text" id="ep-name" placeholder="e.g. Thabo Nkosi" />
+        </div>
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="ep-email" disabled />
+        </div>
+        <div class="input-group">
+          <label>Phone Number</label>
+          <input type="tel" id="ep-phone" placeholder="+27 71 000 0000" />
+        </div>
+        <button class="btn-primary full-w" onclick="saveProfile()">
+          Save Changes
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ SAVED LOCATIONS ═══ -->
+    <div id="saved-locations" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Saved Locations</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="rides-scroll">
+        <div class="input-group">
+          <label>Label</label>
+          <input type="text" id="loc-label" placeholder="e.g. Home, Office" />
+        </div>
+        <div class="input-group">
+          <label>Address</label>
+          <input type="text" id="loc-address" placeholder="Enter full address" />
+        </div>
+        <button
+          class="btn-primary full-w"
+          style="margin-bottom: 16px"
+          onclick="addSavedLocation()"
+        >
+          Add Location
+        </button>
+        <div id="saved-locations-list"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ PAYMENT METHODS ═══ -->
+    <div id="payment-methods" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Payment Methods</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="rides-scroll">
+        <p class="empty-state">
+          Payment is chosen per booking — pay online securely via
+          PayFast (card, EFT, or SnapScan), or pay your chauffeur in
+          cash. Saved cards for one-tap payment are coming in a future
+          update.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ REFER A FRIEND ═══ -->
+    <div id="refer" class="screen app-screen">
+      <div class="app-topbar">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <h2 class="screen-title">Refer & Earn</h2>
+        <button
+          class="theme-toggle-btn"
+          onclick="toggleTheme()"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+      </div>
+      <div class="rides-scroll">
+        <p class="empty-state">
+          Share your code with a friend. Rewards for referrals are
+          coming soon — for now this just links your accounts.
+        </p>
+        <div class="booking-ref" style="margin: 16px auto; width: fit-content">
+          Your code: <strong data-bind="referral.code">—</strong>
+        </div>
+        <button class="btn-primary full-w" onclick="shareReferralCode()">
+          Share Code
+        </button>
+      </div>
+    </div>
+
     <!-- ═══════════════════════════════════════════ NOTIFICATIONS ═══ -->
     <div id="notifications" class="screen app-screen">
       <div class="app-topbar">
@@ -1321,39 +1416,7 @@
         <button class="btn-text" onclick="markAllRead()">Mark all read</button>
       </div>
       <div class="notifs-scroll">
-        <div class="notif-item unread">
-          <div class="notif-dot"></div>
-          <div class="notif-body">
-            <p class="notif-title">🚗 Your chauffeur is 5 minutes away</p>
-            <p class="notif-time">Just now</p>
-          </div>
-        </div>
-        <div class="notif-item unread">
-          <div class="notif-dot"></div>
-          <div class="notif-body">
-            <p class="notif-title">✅ Booking confirmed — Ref: SPK-0042</p>
-            <p class="notif-time">10 minutes ago</p>
-          </div>
-        </div>
-        <div class="notif-item unread">
-          <div class="notif-dot"></div>
-          <div class="notif-body">
-            <p class="notif-title">🎁 Refer a friend, earn R100 credit</p>
-            <p class="notif-time">2 hours ago</p>
-          </div>
-        </div>
-        <div class="notif-item">
-          <div class="notif-body">
-            <p class="notif-title">⭐ Rate your last ride with James</p>
-            <p class="notif-time">Yesterday</p>
-          </div>
-        </div>
-        <div class="notif-item">
-          <div class="notif-body">
-            <p class="notif-title">✨ You've reached Gold membership!</p>
-            <p class="notif-time">3 days ago</p>
-          </div>
-        </div>
+        <p class="empty-state">You're all caught up.</p>
       </div>
     </div>
 
@@ -1361,18 +1424,23 @@
     <div id="toast" class="toast"></div>
 
     <!--
-  app.js uses type="module" so Vite can trace and bundle it.
-  Modern Android WebView (Chrome 90+) and iOS 15 WKWebView both
-  support ES modules natively over file:// protocol.
-  All functions are attached to window.* for inline onclick="" handlers.
--->
-    <script type="module" src="./app.js"></script>
+      Google Maps JS API — Bootstrap Loader (no libraries= param).
+      The __MAPS_KEY__ placeholder is replaced at build time by the
+      injectMapsKey Vite plugin reading VITE_MAPS_KEY from .env.local.
+      Never hardcode the real key here.
+    -->
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=__MAPS_KEY__&loading=async"
+      async
+      defer
+    ></script>
+
+    <!-- Siphika modular entry point -->
+    <script type="module" src="./main.js"></script>
 
     <!--
-  cordova.js is injected HERE by the Vite plugin (see vite.config.js:
-  injectCordovaLoader). This comment is a placeholder marker.
-  DO NOT add a <script src="cordova.js"> manually — Vite will try to
-  bundle it and emit the "can't be bundled" warning.
--->
+      cordova.js is injected HERE post-build by the injectCordovaLoader
+      Vite plugin (vite.config.js). Do NOT add it manually.
+    -->
   </body>
 </html>

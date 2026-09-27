@@ -1,0 +1,13 @@
+
+# .claudeignore
+# Ignore heavy dependencies and build outputs to save token quota
+node_modules/
+dist/
+build/
+.git/
+*.log
+
+# Ignore large assets or configuration files outside of development focus
+public/
+tests/large-snapshots/
+.env*

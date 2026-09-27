@@ -1759,6 +1759,7 @@ body {
   padding: 16px 4px;
   color: var(--text);
   font-size: 15px;
+  text-decoration: none;
   cursor: pointer;
   text-align: left;
   transition: color var(--transition);
@@ -2349,4 +2350,14 @@ body {
 /* Offline banner adapts to theme */
 [data-theme='light'] #offline-banner {
   background: rgba(176, 48, 48, 0.9);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 24px 16px;
+}
+.notif-badge[hidden] {
+  display: none;
 }

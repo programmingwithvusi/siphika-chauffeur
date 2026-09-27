@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Customer profile. The app creates it at registration; tier, totalRides
+    // and rating are locked so a user cannot upgrade themselves.
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.tier == 'standard'
+        && request.resource.data.totalRides == 0
+        && request.resource.data.rating == 0;
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'phone', 'photoURL']);
+      allow delete: if false;
+    }
+
+    // Saved pickup/drop-off addresses. No fare or payment data involved,
+    // so the owner can read/write their own directly — no Cloud Function needed.
+    match /users/{userId}/savedLocations/{locId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Bookings are written by a trusted backend only (fares and payment status
+    // must not be client-editable). Customers can read their own.
+    match /bookings/{bookingId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Driver and vehicle documents hold licence numbers, phone numbers and live
+    // location, and Firestore rules are per document, not per field. Customers
+    // see a safe snapshot on their own booking (bookings/{id}.tracking) instead.
+    match /drivers/{driverId} {
+      allow read, write: if false;
+    }
+    match /vehicles/{vehicleId} {
+      allow read, write: if false;
+    }
+
+    // A customer can review only their own completed booking.
+    match /reviews/{reviewId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
+             .data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
+             .data.status == 'completed';
+      allow update, delete: if false;
+    }
+  }
+}
