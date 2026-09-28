@@ -14,6 +14,7 @@
     <preference name="ShowSplashScreenSpinner" value="false" />
     <preference name="UIWebViewDecelerationSpeed" value="normal" />
     <preference name="KeepRunning" value="true" />
+    <preference name="LoadUrlTimeoutValue" value="60000" />
     <platform name="android">
         <allow-navigation href="https://maps.googleapis.com/*" />
         <allow-navigation href="https://routes.googleapis.com/*" />
