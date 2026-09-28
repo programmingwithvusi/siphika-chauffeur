@@ -169,7 +169,7 @@ npm run dev   # opens http://localhost:5173 for manual testing. Ctrl-C to stop.
 - **A booking's `payment.status` stays `"unpaid"` long after
   completing the sandbox payment:** check the `payfastNotify` logs (see
   the log-fetching Gotcha above) for `"ITN signature mismatch"`. This
-  usually means the signature algorithm in `functions/index.js`
+  usually means the signature algorithm in `functions/src/index.ts`
   (`pfSignature`) doesn't exactly match what PayFast computed —
   compare field-by-field against the raw ITN body rather than guessing;
   temporarily logging the raw body, the received signature, and the

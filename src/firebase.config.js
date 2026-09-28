@@ -18,5 +18,5 @@ const app = initializeApp(firebaseConfig);
 export { app };
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app, 'africa-south1'); // must match functions/index.js's setGlobalOptions region
+export const functions = getFunctions(app, 'africa-south1'); // must match functions/src/index.ts's setGlobalOptions region
 export const googleProvider = new GoogleAuthProvider();

@@ -1,14 +1,14 @@
-const {
-  onCall,
-  onRequest,
-  HttpsError,
-} = require('firebase-functions/v2/https');
-const { setGlobalOptions } = require('firebase-functions/v2');
-const { defineSecret, defineString } = require('firebase-functions/params');
-const crypto = require('crypto');
-const { onInit } = require('firebase-functions/v2/core');
-const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { setGlobalOptions } from 'firebase-functions/v2';
+import { defineSecret, defineString } from 'firebase-functions/params';
+import { createHash } from 'crypto';
+import { onInit } from 'firebase-functions/v2/core';
+import { initializeApp } from 'firebase-admin/app';
+import {
+  getFirestore,
+  FieldValue,
+  type Firestore,
+} from 'firebase-admin/firestore';
 
 // Closer to South Africa than the us-central1 default — cuts round-trip
 // latency for every callable/HTTP function below.
@@ -19,14 +19,18 @@ setGlobalOptions({ region: 'africa-south1' });
 // real GCP runtime and blows the 10s deploy-discovery timeout. onInit()
 // runs on first actual invocation in Cloud Run instead, where that
 // detection is instant.
-let db;
+let db: Firestore;
 onInit(() => {
   initializeApp();
   db = getFirestore();
 });
 
 // Authoritative pricing. Keep in sync with PRICING in src/main.js (display only).
-const PRICING = {
+const PRICING: {
+  surcharge: number;
+  returnMultiplier: number;
+  vehicles: Record<string, { base: number; perKm: number }>;
+} = {
   surcharge: 80,
   returnMultiplier: 1.8,
   vehicles: {
@@ -36,8 +40,11 @@ const PRICING = {
     'Stretch Limousine': { base: 1800, perKm: 55 },
   },
 };
-const TRIP_TYPES = ['one-way', 'return', 'hourly'];
-const KNOWN_EXTRAS = [
+const TRIP_TYPES = ['one-way', 'return', 'hourly'] as const;
+type TripType = (typeof TRIP_TYPES)[number];
+const isTripType = (v: unknown): v is TripType =>
+  TRIP_TYPES.includes(v as TripType);
+const KNOWN_EXTRAS: readonly string[] = [
   'Champagne',
   'Flowers',
   'WiFi',
@@ -46,19 +53,21 @@ const KNOWN_EXTRAS = [
   'Music',
 ];
 
-function resolveExtras(data) {
+function resolveExtras(data: { extras?: unknown }): string[] {
   if (data.extras == null) return [];
   if (!Array.isArray(data.extras))
     throw new HttpsError('invalid-argument', 'Invalid extras.');
-  return [...new Set(data.extras.filter((e) => KNOWN_EXTRAS.includes(e)))];
+  return [
+    ...new Set<string>(data.extras.filter((e) => KNOWN_EXTRAS.includes(e))),
+  ];
 }
 // Statuses a customer may cancel from. Later statuses (chauffeur assigned, arrived,
 // completed) need a cancellation-fee policy first.
-const CANCELLABLE = ['pending', 'confirmed'];
+const CANCELLABLE: readonly string[] = ['pending', 'confirmed'];
 
 // TODO(maps-billing): once Maps billing is on, compute this server-side with the
 // Routes API from pickup/destination instead of trusting the client value.
-function resolveDistanceKm(data) {
+function resolveDistanceKm(data: { distanceKm?: unknown }): number {
   const km = Number(data.distanceKm);
   if (!Number.isFinite(km) || km <= 0 || km > 2000) {
     throw new HttpsError('invalid-argument', 'Valid route distance required.');
@@ -66,15 +75,19 @@ function resolveDistanceKm(data) {
   return km;
 }
 
-function computeFare(vehicle, tripType, distanceKm) {
-  if (tripType === 'hourly') return null; // hourly is quoted later
+function computeFare(
+  vehicle: string,
+  tripType: TripType,
+  distanceKm: number | null,
+): number | null {
+  if (tripType === 'hourly' || distanceKm == null) return null; // hourly is quoted later
   const v = PRICING.vehicles[vehicle];
   const trip = Math.max(v.base, Math.round(distanceKm * v.perKm));
   const mult = tripType === 'return' ? PRICING.returnMultiplier : 1;
   return Math.round(trip * mult) + PRICING.surcharge;
 }
 
-const str = (v, max = 200) =>
+const str = (v: unknown, max = 200): string | null =>
   typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : null;
 
 // ─── PayFast ────────────────────────────────────────────────────────────
@@ -92,14 +105,14 @@ const PAYFAST_SANDBOX = defineString('PAYFAST_SANDBOX', { default: 'true' });
 const RETURN_BASE =
   'https://africa-south1-siphika-chauffeur-5232e.cloudfunctions.net';
 
-function payfastHost() {
+function payfastHost(): string {
   return PAYFAST_SANDBOX.value() === 'false'
     ? 'www.payfast.co.za'
     : 'sandbox.payfast.co.za';
 }
 
 // PayFast requires '+' for spaces (not %20).
-function pfEncode(v) {
+function pfEncode(v: string): string {
   return encodeURIComponent(v).replace(/%20/g, '+');
 }
 
@@ -108,25 +121,44 @@ function pfEncode(v) {
 // the one detail I couldn't fully verify from official docs; if PayFast
 // rejects the signature during sandbox testing, this order is the first
 // thing to recheck.
-function pfSignature(fields, passphrase) {
+function pfSignature(
+  fields: Record<string, unknown>,
+  passphrase?: string,
+): string {
   const pairs = Object.entries(fields)
     .filter(([, v]) => v !== undefined && v !== null)
     .map(([k, v]) => `${k}=${pfEncode(String(v))}`);
   if (passphrase) pairs.push(`passphrase=${pfEncode(passphrase)}`);
-  return crypto.createHash('md5').update(pairs.join('&')).digest('hex');
+  return createHash('md5').update(pairs.join('&')).digest('hex');
 }
 
-exports.createBooking = onCall(async (request) => {
+interface CreateBookingData {
+  pickup?: unknown;
+  destination?: unknown;
+  date?: unknown;
+  time?: unknown;
+  tripType?: unknown;
+  vehicle?: unknown;
+  distanceKm?: unknown;
+  extras?: unknown;
+  notes?: unknown;
+}
+
+export const createBooking = onCall(async (request) => {
   if (!request.auth)
     throw new HttpsError('unauthenticated', 'Sign in to book.');
-  const d = request.data || {};
+  const d: CreateBookingData = request.data || {};
   const pickup = str(d.pickup);
   const destination = str(d.destination);
   const date = str(d.date, 10);
   const time = str(d.time, 5);
   if (!pickup || !destination || !date || !time)
     throw new HttpsError('invalid-argument', 'Missing booking details.');
-  if (!TRIP_TYPES.includes(d.tripType) || !PRICING.vehicles[d.vehicle])
+  if (
+    !isTripType(d.tripType) ||
+    typeof d.vehicle !== 'string' ||
+    !PRICING.vehicles[d.vehicle]
+  )
     throw new HttpsError('invalid-argument', 'Invalid trip type or vehicle.');
 
   const distanceKm = d.tripType === 'hourly' ? null : resolveDistanceKm(d);
@@ -153,18 +185,20 @@ exports.createBooking = onCall(async (request) => {
   return { bookingId: ref.id, fare };
 });
 
-exports.cancelBooking = onCall(async (request) => {
+export const cancelBooking = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const uid = request.auth.uid;
   const bookingId = str(request.data?.bookingId, 128);
   if (!bookingId) throw new HttpsError('invalid-argument', 'Missing booking.');
 
   const ref = db.collection('bookings').doc(bookingId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    const booking = snap.data();
     // Same error for "missing" and "not yours" so IDs can't be probed.
-    if (!snap.exists || snap.data().userId !== request.auth.uid)
+    if (!booking || booking.userId !== uid)
       throw new HttpsError('not-found', 'Booking not found.');
-    if (!CANCELLABLE.includes(snap.data().status))
+    if (!CANCELLABLE.includes(booking.status))
       throw new HttpsError(
         'failed-precondition',
         'This booking can no longer be cancelled.',
@@ -178,7 +212,7 @@ exports.cancelBooking = onCall(async (request) => {
   return { ok: true };
 });
 
-exports.linkReferral = onCall(async (request) => {
+export const linkReferral = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   const code = str(request.data?.code, 32);
   if (!code) return { linked: false };
@@ -201,7 +235,7 @@ exports.linkReferral = onCall(async (request) => {
   return { linked: true };
 });
 
-exports.createPayfastPayment = onCall(
+export const createPayfastPayment = onCall(
   { secrets: [PAYFAST_MERCHANT_ID, PAYFAST_MERCHANT_KEY, PAYFAST_PASSPHRASE] },
   async (request) => {
     if (!request.auth)
@@ -211,10 +245,9 @@ exports.createPayfastPayment = onCall(
       throw new HttpsError('invalid-argument', 'Missing booking.');
 
     const bookingRef = db.collection('bookings').doc(bookingId);
-    const snap = await bookingRef.get();
-    if (!snap.exists || snap.data().userId !== request.auth.uid)
+    const booking = (await bookingRef.get()).data();
+    if (!booking || booking.userId !== request.auth.uid)
       throw new HttpsError('not-found', 'Booking not found.');
-    const booking = snap.data();
     if (booking.payment?.status === 'paid')
       throw new HttpsError(
         'failed-precondition',
@@ -229,10 +262,10 @@ exports.createPayfastPayment = onCall(
     // Fare comes from our own stored booking, never from the client —
     // this is what stops someone paying whatever amount they choose.
     const userSnap = await db.collection('users').doc(request.auth.uid).get();
-    const userData = userSnap.exists ? userSnap.data() : {};
+    const userData = userSnap.data() ?? {};
     const [nameFirst, ...rest] = (userData.name || 'Guest').trim().split(/\s+/);
 
-    const fields = {
+    const fields: Record<string, string> = {
       merchant_id: PAYFAST_MERCHANT_ID.value(),
       merchant_key: PAYFAST_MERCHANT_KEY.value(),
       return_url: `${RETURN_BASE}/paymentReturn`,
@@ -255,7 +288,7 @@ exports.createPayfastPayment = onCall(
   },
 );
 
-exports.payfastNotify = onRequest(
+export const payfastNotify = onRequest(
   { secrets: [PAYFAST_PASSPHRASE] },
   async (req, res) => {
     try {
@@ -267,7 +300,8 @@ exports.payfastNotify = onRequest(
 
       if (received !== expected) {
         console.warn('[Siphika PayFast] ITN signature mismatch — ignoring.');
-        return res.status(200).send('OK');
+        res.status(200).send('OK');
+        return;
       }
 
       // Never trust ITN on signature match alone — confirm with PayFast directly.
@@ -281,20 +315,22 @@ exports.payfastNotify = onRequest(
       );
       if ((await confirm.text()).trim() !== 'VALID') {
         console.warn('[Siphika PayFast] ITN failed PayFast validation.');
-        return res.status(200).send('OK');
+        res.status(200).send('OK');
+        return;
       }
 
       const bookingRef = db.collection('bookings').doc(body.m_payment_id || '');
-      const bookingSnap = await bookingRef.get();
-      if (!bookingSnap.exists) {
+      const booking = (await bookingRef.get()).data();
+      if (!booking) {
         console.warn(
           '[Siphika PayFast] ITN for unknown booking:',
           body.m_payment_id,
         );
-        return res.status(200).send('OK');
+        res.status(200).send('OK');
+        return;
       }
 
-      const expectedAmount = Number(bookingSnap.data().fare);
+      const expectedAmount = Number(booking.fare);
       const paidAmount = parseFloat(body.amount_gross);
       const amountOk = Math.abs(paidAmount - expectedAmount) < 0.01;
 
@@ -324,12 +360,12 @@ exports.payfastNotify = onRequest(
 );
 
 // Minimal pages the InAppBrowser briefly shows before main.js closes it.
-function simplePage(message) {
+function simplePage(message: string): string {
   return `<!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:40px"><p>${message}</p><p>You can close this window.</p></body></html>`;
 }
-exports.paymentReturn = onRequest((req, res) =>
-  res.status(200).send(simplePage('Payment received — confirming…')),
-);
-exports.paymentCancel = onRequest((req, res) =>
-  res.status(200).send(simplePage('Payment cancelled.')),
-);
+export const paymentReturn = onRequest((_req, res) => {
+  res.status(200).send(simplePage('Payment received — confirming…'));
+});
+export const paymentCancel = onRequest((_req, res) => {
+  res.status(200).send(simplePage('Payment cancelled.'));
+});

@@ -6,7 +6,7 @@
             JSON (Firebase Console → Project settings → Service accounts).
             Keep that key OUTSIDE the repo — it has full admin access.
 
-   Writes two bookings shaped exactly like functions/index.js's
+   Writes two bookings shaped exactly like functions/src/index.ts's
    createBooking output, so the app's own screens (tracking, ride history)
    render them without any special-casing for test data:
      - seed-active-ride: status 'confirmed', with a live tracking snapshot.

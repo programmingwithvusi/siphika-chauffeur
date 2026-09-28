@@ -52,6 +52,11 @@ gateway, and a verified Cordova build pipeline.
   `cordova platform add`.
 - Confirmed the existing Cordova scaffold (icons, permissions, plugins,
   `.gitignore`) was already in good shape.
+- Built the Android debug APK and booted it on the emulator. Builds
+  need JDK 17: this machine's `JAVA_HOME` points at a JDK 27 path, so
+  override it inline (`JAVA_HOME="C:/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"`)
+  along with `ANDROID_HOME`/`ANDROID_SDK_ROOT` = `C:/Android/Sdk`.
+- Added `LoadUrlTimeoutValue` (60s) to `config.xml`.
 
 ### Google Maps
 
@@ -95,6 +100,9 @@ gateway, and a verified Cordova build pipeline.
 
 ### Infrastructure
 
+- Converted Cloud Functions to TypeScript (`functions/src/index.ts`,
+  strict mode), built to `lib/` by a `predeploy` step. Verified on the
+  deployed build: booking, PayFast checkout + ITN, cancel, referral.
 - Migrated all Cloud Functions from the `us-central1` default to
   `africa-south1` (Johannesburg) — meaningfully lower latency for
   South African users, and fixed a real payment-page loading problem
