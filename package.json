@@ -3,7 +3,7 @@
   "displayName": "Siphika",
   "version": "1.0.0",
   "description": "Siphika Chauffeur — Premium ride booking app",
-  "type":"commonjs",
+  "type": "module",
   "private": true,
   "engines": {
     "node": ">=20.17.0"
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "npx vite",
     "build": "npx vite build",
-    "assets": "node generate-assets.js",
+    "assets": "node generate-assets.cjs",
     "android": "npm run build && cordova run android",
     "device": "npm run build && cordova run android --device",
     "emulator": "cordova emulate android",
@@ -25,7 +25,7 @@
     "prepare": "cordova prepare",
     "deploy:rules": "npx firebase-tools deploy --only firestore:rules --project siphika-chauffeur-5232e",
     "deploy:functions": "npx firebase-tools deploy --only functions --project siphika-chauffeur-5232e",
-    "seed": "node scripts/seed-firestore.js"
+    "seed": "node scripts/seed-firestore.cjs"
   },
   "devDependencies": {
     "cordova-android": "^14.0.1",
