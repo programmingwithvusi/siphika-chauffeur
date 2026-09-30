@@ -9,23 +9,32 @@
 
 ## Cordova / Device
 
-- **Blocked:** the Google Maps API key's HTTP referrer allowlist
-  doesn't include `https://localhost` — the fixed origin every
-  Cordova WebView runs at — so Maps fails on-device with
-  `RefererNotAllowedMapError` (confirmed via logcat). Fix: add
-  `https://localhost/*` to the key's allowed referrers in Google
-  Cloud Console. Until then no on-device booking can get a
-  route/distance, which blocks any non-hourly booking at the
-  "Select a route first" guard before payment is even reached.
+- **Blocked, worse than first thought:** the Google Maps API key's
+  HTTP referrer allowlist doesn't include `https://localhost` — the
+  fixed origin every Cordova WebView runs at — so Maps fails on-device
+  with `RefererNotAllowedMapError` (confirmed via logcat, on both the
+  emulator and a real device). Fix: add `https://localhost/*` to the
+  key's allowed referrers in Google Cloud Console. Beyond just
+  blocking route/distance (the "Select a route first" guard), on a
+  real device the pickup/destination `<input>` fields became
+  completely untappable once Maps failed — taps on them didn't focus
+  the field at all, instead jumping the page to the bottom of the
+  screen. This points to Google's own Places `Autocomplete` error
+  decoration (visually seen as a tiled "Sorry! Something went wrong"
+  overlay on top of both inputs) intercepting touches on the
+  elements it wraps. Until the referrer is fixed, pickup/destination
+  may not be fillable on-device at all, by typing or otherwise —
+  not just their route/autocomplete functionality.
 - Drive the full booking + payment flow on the emulator/device.
-  Confirmed on-device so far: the app boots into the real UI,
-  registration (Firebase Auth + Firestore write) and login both work
-  end-to-end, the splash "Sign In" fix works, and `confirmBooking()`'s
-  `createBooking` Cloud Function round-trip reaches the backend
-  correctly (returned a real validation error for a test submission
-  missing pickup/destination). Not yet reached on-device: a
-  successfully completed booking, or any PayFast payment — both need
-  the Maps referrer fix above first.
+  Confirmed on both the `Pixel_6_Pro_API_34` emulator and a real
+  device (Samsung SM-G990E, connected over wireless adb): the app
+  boots into the real UI, registration (Firebase Auth + Firestore
+  write) and login both work end-to-end, the splash "Sign In" fix
+  works, and `confirmBooking()`'s `createBooking` Cloud Function
+  round-trip reaches the backend correctly (returned a real
+  validation error for a test submission missing pickup/destination).
+  Not yet reached on-device: a successfully completed booking, or any
+  PayFast payment — both need the Maps referrer fix above first.
 - Verify the PayFast checkout flow specifically through
   `cordova-plugin-inappbrowser` on-device. Only the plain-browser
   `window.open()` fallback path (used when `window.cordova` is
