@@ -9,14 +9,30 @@
 
 ## Cordova / Device
 
-- Drive the full booking + payment flow on the emulator/device. The
-  app builds and boots on the `Pixel_6_Pro_API_34` emulator (splash
-  renders, `deviceready` fires), but only that boot has been checked
-  on-device; everything else was verified in a browser via Playwright.
+- **Blocked:** the Google Maps API key's HTTP referrer allowlist
+  doesn't include `https://localhost` — the fixed origin every
+  Cordova WebView runs at — so Maps fails on-device with
+  `RefererNotAllowedMapError` (confirmed via logcat). Fix: add
+  `https://localhost/*` to the key's allowed referrers in Google
+  Cloud Console. Until then no on-device booking can get a
+  route/distance, which blocks any non-hourly booking at the
+  "Select a route first" guard before payment is even reached.
+- Drive the full booking + payment flow on the emulator/device.
+  Confirmed on-device so far: the app boots into the real UI,
+  registration (Firebase Auth + Firestore write) and login both work
+  end-to-end, the splash "Sign In" fix works, and `confirmBooking()`'s
+  `createBooking` Cloud Function round-trip reaches the backend
+  correctly (returned a real validation error for a test submission
+  missing pickup/destination). Not yet reached on-device: a
+  successfully completed booking, or any PayFast payment — both need
+  the Maps referrer fix above first.
 - Verify the PayFast checkout flow specifically through
   `cordova-plugin-inappbrowser` on-device. Only the plain-browser
   `window.open()` fallback path (used when `window.cordova` is
-  undefined) has been tested.
+  undefined) has been tested. Also blocked by the Maps referrer issue
+  above: hourly bookings force cash and skip PayFast entirely (see
+  `setTripType()`), so reaching a real online-payment booking
+  on-device needs a route, which needs Maps working.
 - Build real Google Sign-In support on-device. `doGoogleSignIn()`
   currently just shows "not available in the app yet — use email"
   when running under Cordova, since Firebase's `signInWithPopup`
