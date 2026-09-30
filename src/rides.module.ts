@@ -2,15 +2,37 @@
    SIPHIKA CHAUFFEUR — Ride history (bookings for the signed-in user)
 ══════════════════════════════════════════════════════════ */
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  type Timestamp,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import { auth, db } from './firebase.config.js';
 
-let stopSync = null;
+let stopSync: Unsubscribe | null = null;
 
-const formatRand = (n) => `R${Number(n).toLocaleString()}`;
-const fareText = (b) => (b.fare != null ? formatRand(b.fare) : 'Quoted');
+interface Booking {
+  status?: string;
+  date?: string;
+  vehicle?: string;
+  fare?: number | null;
+  pickup: string;
+  destination: string;
+  createdAt?: Timestamp | null;
+}
 
-function statusInfo(status) {
+interface Row {
+  id: string;
+  data: Booking;
+}
+
+const formatRand = (n: number) => `R${Number(n).toLocaleString()}`;
+const fareText = (b: Booking) => (b.fare != null ? formatRand(b.fare) : 'Quoted');
+
+function statusInfo(status?: string) {
   if (status === 'completed')
     return { filter: 'completed', label: 'Completed', badge: 'completed' };
   if (status === 'cancelled')
@@ -19,7 +41,7 @@ function statusInfo(status) {
   return { filter: 'in-progress', label, badge: 'in-progress' };
 }
 
-function formatDate(date) {
+function formatDate(date?: string): string {
   const d = new Date(`${date}T00:00`);
   return Number.isNaN(d.getTime())
     ? date || ''
@@ -31,20 +53,24 @@ function formatDate(date) {
 }
 
 // textContent only: pickup/destination are user-entered, so never innerHTML.
-function el(tag, className, text) {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string | null,
+): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
 }
 
-function openTracking(id) {
+function openTracking(id: string) {
   window.dispatchEvent(
     new CustomEvent('siphika:track-booking', { detail: { id } }),
   );
 }
 
-function historyCard({ id, data: b }) {
+function historyCard({ id, data: b }: Row) {
   const s = statusInfo(b.status);
   const card = el('div', 'history-card');
   card.dataset.status = s.filter;
@@ -67,7 +93,7 @@ function historyCard({ id, data: b }) {
   return card;
 }
 
-function recentCard({ id, data: b }) {
+function recentCard({ id, data: b }: Row) {
   const s = statusInfo(b.status);
   const active = s.filter === 'in-progress';
   const card = el('div', 'ride-card');
@@ -89,8 +115,8 @@ function recentCard({ id, data: b }) {
   return card;
 }
 
-function render(bookings) {
-  const fill = (id, cards, emptyText) => {
+function render(bookings: Row[]) {
+  const fill = (id: string, cards: HTMLElement[], emptyText: string) => {
     const host = document.getElementById(id);
     if (host)
       host.replaceChildren(
@@ -103,7 +129,7 @@ function render(bookings) {
     bookings.slice(0, 3).map(recentCard),
     'No rides yet. Book your first ride above.',
   );
-  document.querySelector('.filter-tab.active-tab')?.click(); // reapply current filter
+  document.querySelector<HTMLElement>('.filter-tab.active-tab')?.click(); // reapply current filter
 }
 
 export function initRides() {
@@ -114,8 +140,11 @@ export function initRides() {
     stopSync = onSnapshot(
       query(collection(db, 'bookings'), where('userId', '==', user.uid)),
       (snap) => {
-        const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
-        const t = (r) => r.data.createdAt?.toMillis?.() ?? 0;
+        const rows: Row[] = snap.docs.map((d) => ({
+          id: d.id,
+          data: d.data() as Booking,
+        }));
+        const t = (r: Row) => r.data.createdAt?.toMillis?.() ?? 0;
         render(rows.sort((a, b) => t(b) - t(a)));
       },
       (err) => console.error('[Siphika Rides] sync failed:', err),

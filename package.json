@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "npx vite",
     "build": "npx vite build",
+    "typecheck": "tsc -p src --noEmit",
     "assets": "node generate-assets.cjs",
     "android": "npm run build && cordova run android",
     "device": "npm run build && cordova run android --device",
@@ -28,11 +29,13 @@
     "seed": "node scripts/seed-firestore.cjs"
   },
   "devDependencies": {
+    "@types/google.maps": "^3.66.4",
     "cordova-android": "^14.0.1",
     "cordova-browser": "^7.0.0",
     "firebase-admin": "^14.4.0",
     "sharp": "^0.35.4",
     "terser": "^5.0.0",
+    "typescript": "~5.9.3",
     "vite": "^8.3.0"
   },
   "cordova": {

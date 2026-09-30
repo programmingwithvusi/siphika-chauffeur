@@ -1,19 +1,35 @@
 /* ══════════════════════════════════════════════════════════
    SIPHIKA CHAUFFEUR — Real-Time Firestore Tracking Module
 ══════════════════════════════════════════════════════════ */
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase.config.js';
 import { mapState } from './maps.module.js';
 
-let activeTrackingListener = null;
-let activeChauffeurMarker = null;
-let lastStatus = null;
+type ChauffeurMarker = google.maps.Marker | google.maps.marker.AdvancedMarkerElement;
+
+let activeTrackingListener: Unsubscribe | null = null;
+let activeChauffeurMarker: ChauffeurMarker | null = null;
+let lastStatus: string | null = null;
+
+interface TrackingSnapshot {
+  status?: string;
+  pickup?: string;
+  destination?: string;
+  distanceKm?: number | null;
+  fare?: number | null;
+  tracking?: {
+    chauffeurName?: string;
+    etaMinutes?: number;
+    vehicleDetails?: string;
+    currentLocation?: { lat: number; lng: number };
+  };
+}
 
 /**
  * Initializes a real-time Firestore database synchronization channel for an active trip.
  * @param {string} bookingId - The document index identification string within Firestore.
  */
-export function startLiveTripSync(bookingId) {
+export function startLiveTripSync(bookingId: string) {
   // Clear any existing active subscription streams first to prevent connection leaks
   if (activeTrackingListener) {
     activeTrackingListener();
@@ -31,7 +47,7 @@ export function startLiveTripSync(bookingId) {
         return;
       }
 
-      const tripData = snapshot.data();
+      const tripData = snapshot.data() as TrackingSnapshot;
       updateLiveTrackingUI(tripData);
     },
     (error) => {
@@ -50,8 +66,7 @@ export function stopLiveTripSync() {
     console.log('[Siphika Tracking] Live sync detached safely.');
   }
   if (activeChauffeurMarker) {
-    if (typeof activeChauffeurMarker.setMap === 'function')
-      activeChauffeurMarker.setMap(null);
+    if ('setMap' in activeChauffeurMarker) activeChauffeurMarker.setMap(null);
     else activeChauffeurMarker.map = null;
     activeChauffeurMarker = null;
   }
@@ -60,12 +75,12 @@ export function stopLiveTripSync() {
 /**
  * Dynamically re-maps application screens based on background server telemetry variables.
  */
-function updateLiveTrackingUI(data) {
+function updateLiveTrackingUI(data: TrackingSnapshot) {
   const { status, pickup, destination, distanceKm, fare } = data;
   const { chauffeurName, etaMinutes, vehicleDetails, currentLocation } =
     data.tracking || {};
 
-  const setTrack = (key, text) =>
+  const setTrack = (key: string, text: string) =>
     document
       .querySelectorAll(`[data-track="${key}"]`)
       .forEach((el) => (el.textContent = text));
@@ -99,6 +114,7 @@ function updateLiveTrackingUI(data) {
 
   // 2. Real-Time Physical Vehicle Positioning Map Calculations
   if (currentLocation && mapState.map && mapState.initialized) {
+    const map = mapState.map as google.maps.Map;
     const newPos = new google.maps.LatLng(
       currentLocation.lat,
       currentLocation.lng,
@@ -108,7 +124,7 @@ function updateLiveTrackingUI(data) {
       // Build visual pin node representing the vehicle structure dynamically
       const carPin = document.createElement('div');
       carPin.style.cssText = `
-        width: 24px; height: 24px; background: #C9A84C; 
+        width: 24px; height: 24px; background: #C9A84C;
         border: 2px solid #FFF; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-size: 12px;
@@ -116,22 +132,25 @@ function updateLiveTrackingUI(data) {
       carPin.textContent = '🚗';
 
       if (mapState.AdvancedMarker) {
-        activeChauffeurMarker = new mapState.AdvancedMarker({
+        const AdvancedMarkerCtor = mapState.AdvancedMarker as new (
+          options: google.maps.marker.AdvancedMarkerElementOptions,
+        ) => google.maps.marker.AdvancedMarkerElement;
+        activeChauffeurMarker = new AdvancedMarkerCtor({
           position: newPos,
-          map: mapState.map,
+          map,
           content: carPin,
           title: 'Your Chauffeur',
         });
       } else {
         activeChauffeurMarker = new google.maps.Marker({
           position: newPos,
-          map: mapState.map,
+          map,
           title: 'Your Chauffeur',
         });
       }
     } else {
       // Smoothly update location position markers
-      if (typeof activeChauffeurMarker.setPosition === 'function') {
+      if ('setPosition' in activeChauffeurMarker) {
         activeChauffeurMarker.setPosition(newPos);
       } else {
         activeChauffeurMarker.position = newPos;
@@ -139,12 +158,12 @@ function updateLiveTrackingUI(data) {
     }
 
     // Pan map camera framing wrapper to lock focused perspective coordinates cleanly
-    mapState.map.panTo(newPos);
+    map.panTo(newPos);
   }
 
   // 3. Fire local toast alert prompts depending on structural context state anomalies
   if (status === 'arrived' && lastStatus !== 'arrived') {
     window.showToast('🚗 Your chauffeur has arrived!');
   }
-  lastStatus = status;
+  lastStatus = status ?? null;
 }

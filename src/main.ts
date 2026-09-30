@@ -25,6 +25,41 @@ import { initSavedLocations, addSavedLocation } from './locations.module.js';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from './firebase.config.js';
 
+// ─── AMBIENT GLOBALS THIS MODULE OWNS ────────────────────
+// Every window.* assignment in the "GLOBAL DELEGATE ROUTER ATTACHMENTS"
+// section below needs a matching signature here — main.ts is the only
+// module that performs these assignments, so this is the right place to
+// declare them. Globals main.ts does NOT assign (window.cordova,
+// window.StatusBar, gm_authFailure, navigator.app) live in global.d.ts.
+declare global {
+  interface Window {
+    showToast(message: string): void;
+    goTo(id: string): void;
+    goBack(): void;
+    initMapsDirect(): Promise<void>;
+    doRegister(): Promise<void>;
+    doLogin(): Promise<void>;
+    doGoogleSignIn(): Promise<void>;
+    doSignOut(): Promise<void>;
+    saveProfile(): Promise<void>;
+    addSavedLocation(): Promise<void>;
+    shareReferralCode(): Promise<void>;
+    selectFleet(el: HTMLElement, name: string): void;
+    selectVehicle(el: HTMLElement, name: string): void;
+    setTripType(el: HTMLElement, type: string): void;
+    confirmBooking(): Promise<void>;
+    cancelRide(): Promise<void>;
+    selectPayment(el: HTMLElement): void;
+    filterRides(el: HTMLElement, status: string): void;
+    markAllRead(): void;
+    schedule(): void;
+    swapLocations(): void;
+    drawRoute(): Promise<void>;
+    useMyLocation(): void;
+    toggleTheme(): void;
+  }
+}
+
 const createBookingFn = httpsCallable(functions, 'createBooking');
 const cancelBookingFn = httpsCallable(functions, 'cancelBooking');
 const createPayfastPaymentFn = httpsCallable(functions, 'createPayfastPayment');
@@ -38,6 +73,12 @@ if (
   cordovaScript.src = 'cordova.js';
   document.head.appendChild(cordovaScript);
 }
+
+interface VehicleTier {
+  base: number;
+  perKm: number;
+}
+
 // Pricing config: single source of truth. Move to Firestore later without touching UI logic.
 const PRICING = {
   surcharge: 80,
@@ -48,27 +89,31 @@ const PRICING = {
     'Business Class': { base: 680, perKm: 20 },
     'Luxury SUV': { base: 950, perKm: 28 },
     'Stretch Limousine': { base: 1800, perKm: 55 },
-  },
+  } as Record<string, VehicleTier>,
 };
 
-const formatRand = (n) => `R${Number(n).toLocaleString()}`;
-const setText = (id, text) => {
+const formatRand = (n: number): string => `R${Number(n).toLocaleString()}`;
+const setText = (id: string, text: string) => {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
 };
-const setConf = (key, text) =>
+const setConf = (key: string, text: string) =>
   document
     .querySelectorAll(`[data-conf="${key}"]`)
     .forEach((el) => (el.textContent = text));
 
 // Shared by the confirm-screen preview and the actual booking payload.
-function getCheckedExtras() {
-  return [...document.querySelectorAll('.extra-toggle input:checked')];
+function getCheckedExtras(): HTMLInputElement[] {
+  return [
+    ...document.querySelectorAll<HTMLInputElement>('.extra-toggle input:checked'),
+  ];
 }
 
 function renderPrices() {
-  document.querySelectorAll('[data-price]').forEach((el) => {
-    const v = PRICING.vehicles[el.dataset.price];
+  document.querySelectorAll<HTMLElement>('[data-price]').forEach((el) => {
+    const key = el.dataset.price;
+    if (!key) return;
+    const v = PRICING.vehicles[key];
     if (!v) return;
     const amount = formatRand(v.base);
     el.textContent = el.classList.contains('fleet-price')
@@ -77,7 +122,32 @@ function renderPrices() {
   });
 }
 
-const state = {
+interface SessionUser {
+  name?: string;
+  email?: string;
+  phone?: string;
+  referralCode?: string;
+}
+
+interface SelectedVehicle {
+  name: string;
+  price: number;
+}
+
+interface AppState {
+  history: string[];
+  currentScreen: string;
+  selectedVehicle: SelectedVehicle;
+  selectedTripType: string;
+  paymentMethod: string;
+  fareMultiplier: number | null;
+  currentFare: number;
+  _backPressedOnce: boolean;
+  user: SessionUser | null;
+  activeBookingRef?: string | null;
+}
+
+const state: AppState = {
   history: ['splash'],
   currentScreen: 'splash',
   selectedVehicle: {
@@ -93,16 +163,16 @@ const state = {
 };
 
 // ─── TRANSITIONAL VIEW MANAGER ───────────────────────────
-function goTo(id) {
+function goTo(id: string) {
   const current = document.getElementById(state.currentScreen);
   const next = document.getElementById(id);
   if (!next || id === state.currentScreen) return;
 
-  current.classList.add('exit');
-  current.classList.remove('active');
+  current?.classList.add('exit');
+  current?.classList.remove('active');
 
   setTimeout(() => {
-    current.classList.remove('exit');
+    current?.classList.remove('exit');
     next.classList.add('active');
     next.scrollTop = 0;
     next
@@ -124,7 +194,7 @@ function goBack() {
   }, 300);
 }
 
-function onScreenEnter(id) {
+function onScreenEnter(id: string) {
   // Tear down live monitoring context if transitioning out of active tracking layouts
   if (id !== 'tracking') {
     stopLiveTripSync();
@@ -137,11 +207,15 @@ function onScreenEnter(id) {
     case 'confirm':
       updateConfirmDetails();
       break;
-    case 'edit-profile':
-      document.getElementById('ep-name').value = state.user?.name || '';
-      document.getElementById('ep-email').value = state.user?.email || '';
-      document.getElementById('ep-phone').value = state.user?.phone || '';
+    case 'edit-profile': {
+      const nameInput = document.getElementById('ep-name') as HTMLInputElement | null;
+      const emailInput = document.getElementById('ep-email') as HTMLInputElement | null;
+      const phoneInput = document.getElementById('ep-phone') as HTMLInputElement | null;
+      if (nameInput) nameInput.value = state.user?.name || '';
+      if (emailInput) emailInput.value = state.user?.email || '';
+      if (phoneInput) phoneInput.value = state.user?.phone || '';
       break;
+    }
     case 'refer': {
       const code =
         state.user?.referralCode ||
@@ -184,7 +258,7 @@ function updateGreeting() {
   else greetEl.textContent = 'Good evening,';
 }
 
-function selectFleet(el, name) {
+function selectFleet(el: HTMLElement, name: string) {
   document
     .querySelectorAll('.fleet-card')
     .forEach((c) => c.classList.remove('active-fleet'));
@@ -192,7 +266,7 @@ function selectFleet(el, name) {
   showToast(`${name} selected`);
 }
 
-function selectVehicle(el, name) {
+function selectVehicle(el: HTMLElement, name: string) {
   document
     .querySelectorAll('.vehicle-option')
     .forEach((v) => v.classList.remove('selected'));
@@ -202,15 +276,14 @@ function selectVehicle(el, name) {
     price: PRICING.vehicles[name].base,
   };
   updateFareSummary();
-  if (mapState.routeDrawn && document.getElementById('route-distance')) {
-    const activeDistance = parseFloat(
-      document.getElementById('route-distance').textContent,
-    );
+  const distanceEl = document.getElementById('route-distance');
+  if (mapState.routeDrawn && distanceEl) {
+    const activeDistance = parseFloat(distanceEl.textContent ?? '');
     if (!isNaN(activeDistance)) updateFareFromDistance(activeDistance);
   }
 }
 
-function setTripType(el, type) {
+function setTripType(el: HTMLElement, type: string) {
   document
     .querySelectorAll('.trip-type')
     .forEach((t) => t.classList.remove('active-type'));
@@ -223,7 +296,9 @@ function setTripType(el, type) {
   } else if (type === 'hourly') {
     state.fareMultiplier = null;
     showToast(`Hourly rate: R${PRICING.hourlyRate}/hr minimum 2hr`);
-    const cashOpt = document.querySelector('.payment-opt[data-method="cash"]');
+    const cashOpt = document.querySelector<HTMLElement>(
+      '.payment-opt[data-method="cash"]',
+    );
     if (cashOpt) selectPayment(cashOpt);
   } else {
     state.fareMultiplier = 1;
@@ -239,8 +314,12 @@ function updateFareSummary() {
   }
   const base = state.selectedVehicle.price;
   const surcharge = PRICING.surcharge;
-  let total = Math.round(base * state.fareMultiplier) + surcharge;
-  setText('fare-base', formatRand(Math.round(base * state.fareMultiplier)));
+  // fareMultiplier is only ever null while selectedTripType === 'hourly',
+  // which already returned above — the ?? 1 just satisfies strict null
+  // checking for that invariant.
+  const mult = state.fareMultiplier ?? 1;
+  const total = Math.round(base * mult) + surcharge;
+  setText('fare-base', formatRand(Math.round(base * mult)));
   setText('fare-surcharge', formatRand(surcharge));
 
   const totalEl = document.getElementById('fare-total');
@@ -259,7 +338,7 @@ function updateFareSummary() {
   state.currentFare = total;
 }
 
-function updateFareFromDistance(distKm) {
+function updateFareFromDistance(distKm: number) {
   const vehicleName = state.selectedVehicle?.name || 'Executive Sedan';
   const vehicle =
     PRICING.vehicles[vehicleName] ?? PRICING.vehicles['Executive Sedan'];
@@ -272,27 +351,28 @@ function updateFareFromDistance(distKm) {
   const total = Math.round(tripFare * mult) + surcharge;
 
   state.currentFare = total;
-  document.getElementById('route-fare').textContent =
-    `R${total.toLocaleString()}`;
-  document.getElementById('fare-total').textContent =
-    `R${total.toLocaleString()}`;
+  const routeFareEl = document.getElementById('route-fare');
+  if (routeFareEl) routeFareEl.textContent = `R${total.toLocaleString()}`;
+  const fareTotalEl = document.getElementById('fare-total');
+  if (fareTotalEl) fareTotalEl.textContent = `R${total.toLocaleString()}`;
 
   setText('fare-base', formatRand(Math.round(tripFare * mult)));
   setText('fare-surcharge', formatRand(surcharge));
 }
 
 window.addEventListener('siphika:route-updated', (e) => {
-  if (e.detail && e.detail.distance) updateFareFromDistance(e.detail.distance);
+  const detail = (e as CustomEvent<{ distance?: number }>).detail;
+  if (detail?.distance) updateFareFromDistance(detail.distance);
 });
 
 // Ride cards ask to track a booking; main owns navigation and state.
 window.addEventListener('siphika:track-booking', (e) => {
-  state.activeBookingRef = e.detail.id;
+  state.activeBookingRef = (e as CustomEvent<{ id: string }>).detail.id;
   goTo('tracking');
 });
 
 function setDefaultDateTime() {
-  const dateInput = document.getElementById('book-date');
+  const dateInput = document.getElementById('book-date') as HTMLInputElement | null;
   if (dateInput && !dateInput.value)
     dateInput.value = new Date().toISOString().split('T')[0];
 }
@@ -300,10 +380,10 @@ function setDefaultDateTime() {
 function updateConfirmDetails() {
   const dateEl = document.getElementById('conf-dt');
   if (!dateEl) return;
-  const date =
-    document.getElementById('book-date')?.value ||
-    new Date().toISOString().split('T')[0];
-  const time = document.getElementById('book-time')?.value || '08:00';
+  const dateInputEl = document.getElementById('book-date') as HTMLInputElement | null;
+  const timeInputEl = document.getElementById('book-time') as HTMLInputElement | null;
+  const date = dateInputEl?.value || new Date().toISOString().split('T')[0];
+  const time = timeInputEl?.value || '08:00';
   const formatted =
     new Date(date + 'T' + time).toLocaleDateString('en-ZA', {
       weekday: 'short',
@@ -314,12 +394,15 @@ function updateConfirmDetails() {
     time;
   dateEl.textContent = formatted;
 
-  const val = (id) => document.getElementById(id)?.value.trim() || '—';
+  const val = (id: string): string => {
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    return input?.value.trim() || '—';
+  };
   setConf('pickup', val('book-pickup'));
   setConf('destination', val('book-dest'));
   setConf('vehicle', state.selectedVehicle.name);
-  const extras = getCheckedExtras().map((cb) =>
-    cb.nextElementSibling.textContent.trim(),
+  const extras = getCheckedExtras().map(
+    (cb) => cb.nextElementSibling?.textContent?.trim() ?? '',
   );
   setConf('extras', extras.length ? extras.join(', ') : 'None');
   setConf(
@@ -329,7 +412,7 @@ function updateConfirmDetails() {
       : formatRand(state.currentFare),
   );
 
-  const confirmBtn = document.querySelector('#confirm .btn-primary');
+  const confirmBtn = document.querySelector<HTMLElement>('#confirm .btn-primary');
   if (confirmBtn && state.currentFare)
     confirmBtn.textContent = `Confirm & Pay R${state.currentFare.toLocaleString()}`;
 }
@@ -343,7 +426,7 @@ async function shareReferralCode() {
       await navigator.share({ text });
       return;
     } catch (err) {
-      if (err.name === 'AbortError') return; // user cancelled the share sheet
+      if ((err as { name?: string }).name === 'AbortError') return; // user cancelled the share sheet
     }
   }
   try {
@@ -354,30 +437,31 @@ async function shareReferralCode() {
   }
 }
 
-async function launchPayfastCheckout(bookingId) {
-  let url;
+interface PayfastPaymentResult {
+  url: string;
+}
+
+async function launchPayfastCheckout(bookingId: string) {
+  let url: string;
   try {
     const { data } = await createPayfastPaymentFn({ bookingId });
-    url = data.url;
+    url = (data as PayfastPaymentResult).url;
   } catch (err) {
     console.error('[Siphika Payment] createPayfastPayment failed:', err);
     showToast('Could not start payment — you can pay later from Rides');
     return;
   }
 
-  if (window.cordova?.InAppBrowser) {
-    await new Promise((resolve) => {
-      const ref = cordova.InAppBrowser.open(
-        url,
-        '_blank',
-        'location=yes,toolbar=yes',
-      );
+  const inAppBrowser = window.cordova?.InAppBrowser;
+  if (inAppBrowser) {
+    await new Promise<void>((resolve) => {
+      const ref = inAppBrowser.open(url, '_blank', 'location=yes,toolbar=yes');
       const finish = () => {
         ref.removeEventListener('loadstart', onLoadStart);
         ref.removeEventListener('exit', finish);
         resolve();
       };
-      const onLoadStart = (event) => {
+      const onLoadStart = (event: CordovaInAppBrowserEvent) => {
         if (/\/(paymentReturn|paymentCancel)\b/.test(event.url || ''))
           ref.close();
       };
@@ -393,15 +477,19 @@ async function launchPayfastCheckout(bookingId) {
   }
 }
 
+interface CreateBookingResult {
+  bookingId: string;
+  fare: number;
+}
+
 async function confirmBooking() {
   if (!auth.currentUser) return showToast('Please sign in to book');
   const isHourly = state.selectedTripType === 'hourly';
-  const distanceKm = parseFloat(
-    document.getElementById('route-distance')?.textContent,
-  );
+  const distanceEl = document.getElementById('route-distance');
+  const distanceKm = parseFloat(distanceEl?.textContent ?? '');
   if (!isHourly && !(distanceKm > 0)) return showToast('Select a route first');
 
-  const btn = document.querySelector('#confirm .btn-primary');
+  const btn = document.querySelector<HTMLButtonElement>('#confirm .btn-primary');
   if (btn) {
     btn.textContent = 'Processing...';
     btn.disabled = true;
@@ -410,25 +498,32 @@ async function confirmBooking() {
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
 
   try {
+    const pickupInput = document.getElementById('book-pickup') as HTMLInputElement | null;
+    const destInput = document.getElementById('book-dest') as HTMLInputElement | null;
+    const dateInput = document.getElementById('book-date') as HTMLInputElement | null;
+    const timeInput = document.getElementById('book-time') as HTMLInputElement | null;
+    const notesInput = document.getElementById('book-notes') as HTMLInputElement | null;
+
     const { data } = await createBookingFn({
-      pickup: document.getElementById('book-pickup')?.value ?? '',
-      destination: document.getElementById('book-dest')?.value ?? '',
-      date: document.getElementById('book-date')?.value ?? '',
-      time: document.getElementById('book-time')?.value ?? '',
+      pickup: pickupInput?.value ?? '',
+      destination: destInput?.value ?? '',
+      date: dateInput?.value ?? '',
+      time: timeInput?.value ?? '',
       tripType: state.selectedTripType,
       vehicle: state.selectedVehicle.name,
       distanceKm: isHourly ? null : distanceKm,
       extras: getCheckedExtras().map((cb) => cb.dataset.extra),
-      notes: document.getElementById('book-notes')?.value.trim() ?? '',
+      notes: notesInput?.value.trim() ?? '',
     });
-    state.activeBookingRef = data.bookingId;
-    state.currentFare = data.fare;
+    const result = data as CreateBookingResult;
+    state.activeBookingRef = result.bookingId;
+    state.currentFare = result.fare;
     document
       .querySelectorAll('[data-bind="booking.ref"]')
-      .forEach((el) => (el.textContent = data.bookingId));
+      .forEach((el) => (el.textContent = result.bookingId));
     if (state.paymentMethod === 'online' && !isHourly) {
       if (btn) btn.textContent = 'Redirecting to secure payment…';
-      await launchPayfastCheckout(data.bookingId);
+      await launchPayfastCheckout(result.bookingId);
     }
     goTo('booked');
   } catch (err) {
@@ -454,7 +549,7 @@ async function cancelRide() {
   } catch (err) {
     console.error('[Siphika Booking] cancel failed:', err);
     showToast(
-      err.code === 'functions/failed-precondition'
+      (err as { code?: string }).code === 'functions/failed-precondition'
         ? 'This ride can no longer be cancelled'
         : 'Could not cancel. Please try again.',
     );
@@ -474,21 +569,21 @@ function triggerSuccessAnimation() {
   );
 }
 
-function selectPayment(el) {
+function selectPayment(el: HTMLElement) {
   document
     .querySelectorAll('.payment-opt')
     .forEach((p) => p.classList.remove('selected'));
   el.classList.add('selected');
-  state.paymentMethod = el.dataset.method;
+  state.paymentMethod = el.dataset.method ?? state.paymentMethod;
 }
 
-function filterRides(el, status) {
+function filterRides(el: HTMLElement, status: string) {
   document
     .querySelectorAll('.filter-tab')
     .forEach((t) => t.classList.remove('active-tab'));
   el.classList.add('active-tab');
 
-  document.querySelectorAll('.history-card').forEach((card) => {
+  document.querySelectorAll<HTMLElement>('.history-card').forEach((card) => {
     if (status === 'all') {
       card.style.display = 'flex';
     } else {
@@ -517,7 +612,7 @@ function markAllRead() {
     const dot = n.querySelector('.notif-dot');
     if (dot) dot.remove();
   });
-  const badge = document.querySelector('.notif-badge');
+  const badge = document.querySelector<HTMLElement>('.notif-badge');
   if (badge) badge.style.display = 'none';
   showToast('All notifications marked as read');
 }
@@ -529,8 +624,8 @@ function schedule() {
   }, 400);
 }
 
-let toastTimer = null;
-export function showToast(message) {
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+export function showToast(message: string) {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.textContent = message;
@@ -549,9 +644,11 @@ function bootApp() {
   setDefaultDateTime();
   updateGreeting();
 
-  document.querySelectorAll('.extra-toggle input').forEach((cb) => {
-    cb.addEventListener('change', () => updateFareSummary());
-  });
+  document
+    .querySelectorAll<HTMLInputElement>('.extra-toggle input')
+    .forEach((cb) => {
+      cb.addEventListener('change', () => updateFareSummary());
+    });
 
   const observer = new IntersectionObserver(
     (entries) => {
@@ -577,8 +674,8 @@ function bootApp() {
     .forEach((el) => observer.observe(el));
 
   if (window.StatusBar) {
-    StatusBar.styleBlackTranslucent();
-    StatusBar.backgroundColorByHexString('#0A0A0C');
+    window.StatusBar.styleBlackTranslucent();
+    window.StatusBar.backgroundColorByHexString('#0A0A0C');
   }
 
   document.addEventListener(

@@ -2,21 +2,40 @@ import { getMapStyle } from './theme.module.js';
 
 // showToast — defined in main.js, exposed on window for cross-module use
 // We use window.showToast to avoid a circular import (main → maps → main)
-const showToast = (msg) => window.showToast?.(msg);
+const showToast = (msg: string) => window.showToast?.(msg);
+
+type AdvancedMarkerCtor = new (
+  options: google.maps.marker.AdvancedMarkerElementOptions,
+) => google.maps.marker.AdvancedMarkerElement;
+type ChauffeurMarker = google.maps.Marker | google.maps.marker.AdvancedMarkerElement;
+
+interface MapState {
+  map: google.maps.Map | null;
+  routesClient: null; // vestigial — route requests go via fetch(), see Fix 3 below
+  routePolyline: google.maps.Polyline | null;
+  AdvancedMarker: AdvancedMarkerCtor | null; // AdvancedMarkerElement constructor ref
+  pickupAutocomplete: google.maps.places.Autocomplete | null;
+  destAutocomplete: google.maps.places.Autocomplete | null;
+  initialized: boolean;
+  routeDrawn: boolean;
+  unavailable: boolean; // true once Google rejects the key or billing is off
+  _markerA: ChauffeurMarker | null; // gold pickup marker
+  _markerB: ChauffeurMarker | null; // white destination marker
+}
 
 // ─── GOOGLE MAPS STATE ───────────────────────────────────
-export const mapState = {
+export const mapState: MapState = {
   map: null,
-  routesClient: null, // Routes API v2 client
-  routePolyline: null, // google.maps.Polyline for the drawn route
-  AdvancedMarker: null, // AdvancedMarkerElement constructor ref
+  routesClient: null,
+  routePolyline: null,
+  AdvancedMarker: null,
   pickupAutocomplete: null,
   destAutocomplete: null,
   initialized: false,
   routeDrawn: false,
-  unavailable: false, // true once Google rejects the key or billing is off
-  _markerA: null, // gold pickup marker
-  _markerB: null, // white destination marker
+  unavailable: false,
+  _markerA: null,
+  _markerB: null,
 };
 
 // Google calls this global when the key is rejected or billing isn't enabled.
@@ -117,8 +136,8 @@ export async function initGoogleMaps() {
     mapState.AdvancedMarker = null;
 
     // ── Autocomplete ──────────────────────────────────────
-    const pickupInput = document.getElementById('book-pickup');
-    const destInput = document.getElementById('book-dest');
+    const pickupInput = document.getElementById('book-pickup') as HTMLInputElement;
+    const destInput = document.getElementById('book-dest') as HTMLInputElement;
 
     const acOptions = {
       componentRestrictions: { country: 'za' },
@@ -126,17 +145,13 @@ export async function initGoogleMaps() {
       strictBounds: false,
     };
 
-    mapState.pickupAutocomplete = new placesLib.Autocomplete(
-      pickupInput,
-      acOptions,
-    );
-    mapState.destAutocomplete = new placesLib.Autocomplete(
-      destInput,
-      acOptions,
-    );
+    const pickupAutocomplete = new placesLib.Autocomplete(pickupInput, acOptions);
+    const destAutocomplete = new placesLib.Autocomplete(destInput, acOptions);
+    mapState.pickupAutocomplete = pickupAutocomplete;
+    mapState.destAutocomplete = destAutocomplete;
 
-    mapState.pickupAutocomplete.addListener('place_changed', () => drawRoute());
-    mapState.destAutocomplete.addListener('place_changed', () => drawRoute());
+    pickupAutocomplete.addListener('place_changed', () => drawRoute());
+    destAutocomplete.addListener('place_changed', () => drawRoute());
 
     pickupInput.addEventListener('change', debounce(drawRoute, 600));
     destInput.addEventListener('change', debounce(drawRoute, 600));
@@ -145,13 +160,14 @@ export async function initGoogleMaps() {
     drawRoute();
   } catch (err) {
     console.error('[Siphika] Google Maps failed to initialise:', err);
-    showMapError(err?.message || 'init failed');
+    showMapError(err instanceof Error ? err.message : 'init failed');
   }
 }
 
 /** Fallback initialisation for when importLibrary is unavailable */
 export async function initMapsDirect() {
   const mapEl = document.getElementById('booking-map');
+  if (!mapEl) return;
   mapState.map = new google.maps.Map(mapEl, {
     center: { lat: -26.2041, lng: 28.0473 },
     zoom: 11,
@@ -165,25 +181,21 @@ export async function initMapsDirect() {
     strokeWeight: 4,
     strokeOpacity: 0.9,
   });
-  const pickupInput = document.getElementById('book-pickup');
-  const destInput = document.getElementById('book-dest');
+  const pickupInput = document.getElementById('book-pickup') as HTMLInputElement;
+  const destInput = document.getElementById('book-dest') as HTMLInputElement;
   const acOptions = { componentRestrictions: { country: 'za' } };
-  mapState.pickupAutocomplete = new google.maps.places.Autocomplete(
-    pickupInput,
-    acOptions,
-  );
-  mapState.destAutocomplete = new google.maps.places.Autocomplete(
-    destInput,
-    acOptions,
-  );
-  mapState.pickupAutocomplete.addListener('place_changed', () => drawRoute());
-  mapState.destAutocomplete.addListener('place_changed', () => drawRoute());
+  const pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, acOptions);
+  const destAutocomplete = new google.maps.places.Autocomplete(destInput, acOptions);
+  mapState.pickupAutocomplete = pickupAutocomplete;
+  mapState.destAutocomplete = destAutocomplete;
+  pickupAutocomplete.addListener('place_changed', () => drawRoute());
+  destAutocomplete.addListener('place_changed', () => drawRoute());
   mapState.AdvancedMarker = null; // fall back to legacy Marker
   mapState.initialized = true;
   drawRoute();
 }
 
-function showMapError(reason) {
+function showMapError(reason: string) {
   console.error(
     `[Siphika] Map unavailable (${reason}). Dev: check billing, key restrictions, and that Maps JS + Routes APIs are enabled.`,
   );
@@ -200,6 +212,18 @@ function showMapError(reason) {
        <small>Please try again later</small></p>`;
 }
 
+interface RoutesApiResponse {
+  routes?: {
+    distanceMeters: number;
+    duration: string; // e.g. "2400s"
+    polyline: { encodedPolyline: string };
+    legs?: {
+      startLocation?: { latLng?: { latitude: number; longitude: number } };
+      endLocation?: { latLng?: { latitude: number; longitude: number } };
+    }[];
+  }[];
+}
+
 /**
  * drawRoute — calls the Routes API (New) to draw a driving route.
  *
@@ -214,8 +238,8 @@ function showMapError(reason) {
  *   routes.duration, routes.distanceMeters, routes.polyline.encodedPolyline
  */
 export async function drawRoute() {
-  const pickup = document.getElementById('book-pickup')?.value.trim();
-  const dest = document.getElementById('book-dest')?.value.trim();
+  const pickup = (document.getElementById('book-pickup') as HTMLInputElement | null)?.value.trim();
+  const dest = (document.getElementById('book-dest') as HTMLInputElement | null)?.value.trim();
 
   if (!pickup || !dest) return;
   if (!mapState.initialized) return;
@@ -277,7 +301,7 @@ export async function drawRoute() {
       return;
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as RoutesApiResponse;
 
     if (!data.routes || data.routes.length === 0) {
       showRouteError('ZERO_RESULTS');
@@ -306,7 +330,7 @@ export async function drawRoute() {
     // Fit map bounds to the route
     const bounds = new google.maps.LatLngBounds();
     path.forEach((p) => bounds.extend(p));
-    mapState.map.fitBounds(bounds, {
+    mapState.map?.fitBounds(bounds, {
       top: 60,
       right: 30,
       bottom: 20,
@@ -320,7 +344,7 @@ export async function drawRoute() {
       const endLat = leg.endLocation?.latLng?.latitude;
       const endLng = leg.endLocation?.latLng?.longitude;
 
-      if (startLat && endLat) {
+      if (startLat != null && startLng != null && endLat != null && endLng != null) {
         placeCustomMarkers(
           { lat: startLat, lng: startLng },
           { lat: endLat, lng: endLng },
@@ -332,9 +356,9 @@ export async function drawRoute() {
 
     // ── Route info bar ────────────────────────────────────
     document.getElementById('map-placeholder-msg')?.classList.add('hidden');
-    document.getElementById('route-distance').textContent = distText;
-    document.getElementById('route-duration').textContent = durText;
-    document.getElementById('route-info').classList.remove('hidden');
+    document.getElementById('route-distance')!.textContent = distText;
+    document.getElementById('route-duration')!.textContent = durText;
+    document.getElementById('route-info')!.classList.remove('hidden');
     mapState.routeDrawn = true;
 
     // ── Live fare from real distance ──────────────────────
@@ -352,16 +376,19 @@ export async function drawRoute() {
  * Place gold pickup (A) and white destination (B) markers.
  * Uses AdvancedMarkerElement (new) — Marker is deprecated.
  */
-function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
+function placeCustomMarkers(
+  startPos: google.maps.LatLngLiteral,
+  endPos: google.maps.LatLngLiteral,
+  startTitle: string,
+  endTitle: string,
+) {
   // Remove old markers cleanly (AdvancedMarker uses .map = null, legacy uses .setMap(null))
   if (mapState._markerA) {
-    if (typeof mapState._markerA.setMap === 'function')
-      mapState._markerA.setMap(null);
+    if ('setMap' in mapState._markerA) mapState._markerA.setMap(null);
     else mapState._markerA.map = null;
   }
   if (mapState._markerB) {
-    if (typeof mapState._markerB.setMap === 'function')
-      mapState._markerB.setMap(null);
+    if ('setMap' in mapState._markerB) mapState._markerB.setMap(null);
     else mapState._markerB.map = null;
   }
 
@@ -394,7 +421,7 @@ function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
     });
   } else {
     // ── Legacy Marker fallback ────────────────────────────
-    const sym = (color, stroke) => ({
+    const sym = (color: string, stroke: string): google.maps.Symbol => ({
       path: google.maps.SymbolPath.CIRCLE,
       scale: 9,
       fillColor: color,
@@ -425,8 +452,8 @@ function placeCustomMarkers(startPos, endPos, startTitle, endTitle) {
  * Implements the standard polyline encoding algorithm.
  * Avoids importing the geometry library for a single utility function.
  */
-function decodePolyline(encoded) {
-  const points = [];
+function decodePolyline(encoded: string): google.maps.LatLng[] {
+  const points: google.maps.LatLng[] = [];
   let index = 0,
     lat = 0,
     lng = 0;
@@ -434,7 +461,7 @@ function decodePolyline(encoded) {
   while (index < encoded.length) {
     let shift = 0,
       result = 0,
-      byte;
+      byte: number;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
@@ -457,8 +484,8 @@ function decodePolyline(encoded) {
 }
 
 /** Extract the API key from the Maps script src at runtime */
-function getApiKey() {
-  const scripts = document.querySelectorAll(
+function getApiKey(): string | null {
+  const scripts = document.querySelectorAll<HTMLScriptElement>(
     'script[src*="maps.googleapis.com"]',
   );
   for (const s of scripts) {
@@ -469,7 +496,7 @@ function getApiKey() {
 }
 
 // ── Map UI helpers ──────────────────────────────────────
-function showMapLoading(show) {
+function showMapLoading(show: boolean) {
   let spinner = document.getElementById('map-spinner-overlay');
   if (!spinner) {
     spinner = document.createElement('div');
@@ -481,11 +508,11 @@ function showMapLoading(show) {
   spinner.classList.toggle('hidden', !show);
 }
 
-function showRouteError(status) {
+function showRouteError(status: string) {
   const el = document.getElementById('route-error');
   if (!el) return;
   el.classList.remove('hidden');
-  const msgs = {
+  const msgs: Record<string, string> = {
     // Routes API v2 status codes
     NOT_FOUND: 'One or both addresses could not be found.',
     ZERO_RESULTS: 'No driving route found between these locations.',
@@ -513,8 +540,8 @@ function hideRouteError() {
 
 /** Swap pickup ↔ destination then redraw */
 export function swapLocations() {
-  const p = document.getElementById('book-pickup');
-  const d = document.getElementById('book-dest');
+  const p = document.getElementById('book-pickup') as HTMLInputElement | null;
+  const d = document.getElementById('book-dest') as HTMLInputElement | null;
   if (!p || !d) return;
   const tmp = p.value;
   p.value = d.value;
@@ -527,13 +554,13 @@ export function swapLocations() {
 // Called by the "Use my location" button on the booking map.
 // Uses cordova-plugin-geolocation (falls back to browser API).
 export function useMyLocation() {
-  const btn = document.getElementById('geolocate-btn');
+  const btn = document.getElementById('geolocate-btn') as HTMLButtonElement | null;
   if (btn) {
     btn.textContent = '📡';
     btn.disabled = true;
   }
 
-  const success = (position) => {
+  const success = (position: GeolocationPosition) => {
     const { latitude, longitude } = position.coords;
     if (btn) {
       btn.textContent = '📍';
@@ -546,9 +573,9 @@ export function useMyLocation() {
       geocoder.geocode(
         { location: { lat: latitude, lng: longitude } },
         (results, status) => {
-          if (status === 'OK' && results[0]) {
+          if (status === 'OK' && results && results[0]) {
             const addr = results[0].formatted_address;
-            const pickupInput = document.getElementById('book-pickup');
+            const pickupInput = document.getElementById('book-pickup') as HTMLInputElement | null;
             if (pickupInput) {
               pickupInput.value = addr;
               drawRoute();
@@ -561,18 +588,18 @@ export function useMyLocation() {
       );
     } else {
       // Maps not loaded yet — just fill coordinates
-      const pickupInput = document.getElementById('book-pickup');
+      const pickupInput = document.getElementById('book-pickup') as HTMLInputElement | null;
       if (pickupInput)
         pickupInput.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     }
   };
 
-  const error = (err) => {
+  const error = (err: GeolocationPositionError) => {
     if (btn) {
       btn.textContent = '📍';
       btn.disabled = false;
     }
-    const msgs = {
+    const msgs: Record<number, string> = {
       1: 'Location permission denied',
       2: 'Location unavailable',
       3: 'Location request timed out',
@@ -587,9 +614,12 @@ export function useMyLocation() {
 }
 
 /** Simple debounce utility */
-function debounce(fn, delay) {
-  let timer;
-  return (...args) => {
+function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void,
+  delay: number,
+): (...args: Args) => void {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Args) => {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
   };

@@ -2,21 +2,37 @@
    SIPHIKA CHAUFFEUR — Saved pickup/drop-off locations
 ══════════════════════════════════════════════════════════ */
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import { auth, db } from './firebase.config.js';
 
-let stopSync = null;
+let stopSync: Unsubscribe | null = null;
+
+interface SavedLocation {
+  label?: string;
+  address?: string;
+}
 
 // Reuses the .history-card / .hc-* classes already styled for ride
 // history, and .empty-state — no new CSS needed.
-function el(tag, className, text) {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string | null,
+): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
 }
 
-function locationCard(id, data) {
+function locationCard(id: string, data: SavedLocation) {
   const card = el('div', 'history-card');
   const top = el('div', 'hc-top');
   top.append(el('span', 'ride-badge completed', data.label || 'Location'));
@@ -26,7 +42,7 @@ function locationCard(id, data) {
   return card;
 }
 
-function render(locations) {
+function render(locations: { id: string; data: SavedLocation }[]) {
   const host = document.getElementById('saved-locations-list');
   if (!host) return;
   host.replaceChildren(
@@ -51,8 +67,14 @@ export function initSavedLocations() {
 
 export async function addSavedLocation() {
   if (!auth.currentUser) return window.showToast('Please sign in');
-  const label = document.getElementById('loc-label')?.value.trim();
-  const address = document.getElementById('loc-address')?.value.trim();
+  const labelInput = document.getElementById(
+    'loc-label',
+  ) as HTMLInputElement | null;
+  const addressInput = document.getElementById(
+    'loc-address',
+  ) as HTMLInputElement | null;
+  const label = labelInput?.value.trim();
+  const address = addressInput?.value.trim();
   if (!label || !address)
     return window.showToast('Enter a label and address');
   try {
@@ -60,8 +82,8 @@ export async function addSavedLocation() {
       label,
       address,
     });
-    document.getElementById('loc-label').value = '';
-    document.getElementById('loc-address').value = '';
+    if (labelInput) labelInput.value = '';
+    if (addressInput) addressInput.value = '';
     window.showToast('Location saved');
   } catch (err) {
     console.error('[Siphika Locations] add failed:', err);
@@ -69,7 +91,7 @@ export async function addSavedLocation() {
   }
 }
 
-export async function deleteSavedLocation(id) {
+export async function deleteSavedLocation(id: string) {
   if (!auth.currentUser) return;
   try {
     await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'savedLocations', id));

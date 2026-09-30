@@ -17,15 +17,34 @@ import {
   updateDoc,
   onSnapshot,
   serverTimestamp,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions, googleProvider } from './firebase.config.js';
 
 const linkReferralFn = httpsCallable(functions, 'linkReferral');
 
-let stopProfileSync = null;
+let stopProfileSync: Unsubscribe | null = null;
 
-export function listenToAuth(onUserLoaded) {
+interface UserProfile {
+  name?: string;
+  email?: string;
+  phone?: string;
+  photoURL?: string;
+  referralCode?: string;
+  referredBy?: string;
+  tier?: string;
+  totalRides?: number;
+  rating?: number;
+  createdAt?: unknown;
+}
+
+function inputValue(id: string, trim = true): string | undefined {
+  const el = document.getElementById(id) as HTMLInputElement | null;
+  return trim ? el?.value.trim() : el?.value;
+}
+
+export function listenToAuth(onUserLoaded?: (profile: UserProfile | null) => void) {
   onAuthStateChanged(auth, (user) => {
     if (stopProfileSync) stopProfileSync();
     stopProfileSync = null;
@@ -38,7 +57,7 @@ export function listenToAuth(onUserLoaded) {
       doc(db, 'users', user.uid),
       (snap) => {
         if (!snap.exists()) return;
-        const data = snap.data();
+        const data = snap.data() as UserProfile;
         renderProfile(data);
         if (onUserLoaded) onUserLoaded(data);
       },
@@ -47,7 +66,7 @@ export function listenToAuth(onUserLoaded) {
   });
 }
 
-function renderProfile(data) {
+function renderProfile(data: UserProfile | null) {
   const name = data?.name || data?.email?.split('@')[0] || 'Guest';
   const initials = name
     .split(' ')
@@ -70,21 +89,21 @@ function renderProfile(data) {
     .forEach((el) => (el.textContent = data?.email || ''));
 
   const tier = data?.tier || 'standard';
-  const fill = (key, text) =>
+  const fill = (key: string, text: string) =>
     document
       .querySelectorAll(`[data-bind="${key}"]`)
       .forEach((el) => (el.textContent = text));
   fill('user.tier', `✦ ${tier[0].toUpperCase()}${tier.slice(1)} Member`);
-  fill('user.totalRides', data?.totalRides ?? 0);
+  fill('user.totalRides', String(data?.totalRides ?? 0));
   fill('user.rating', data?.rating ? Number(data.rating).toFixed(1) : '—');
 }
 
 export async function doRegister() {
-  const name = document.getElementById('reg-name')?.value.trim();
-  const email = document.getElementById('reg-email')?.value.trim();
-  const phone = document.getElementById('reg-phone')?.value.trim();
-  const pass = document.getElementById('reg-pass')?.value;
-  const referralInput = document.getElementById('reg-referral')?.value.trim();
+  const name = inputValue('reg-name');
+  const email = inputValue('reg-email');
+  const phone = inputValue('reg-phone');
+  const pass = inputValue('reg-pass', false);
+  const referralInput = inputValue('reg-referral');
 
   if (!name || !email || !phone || !pass) {
     return window.showToast('Please fill all fields');
@@ -96,7 +115,7 @@ export async function doRegister() {
     return window.showToast('Please enter a valid email');
   }
 
-  const btn = document.querySelector('#register .btn');
+  const btn = document.querySelector<HTMLButtonElement>('#register .btn');
   if (btn) {
     btn.textContent = 'Creating account...';
     btn.disabled = true;
@@ -126,7 +145,7 @@ export async function doRegister() {
     window.showToast('Welcome to Siphika ✦');
     window.goTo('home');
   } catch (err) {
-    window.showToast(firebaseErrorMessage(err.code));
+    window.showToast(firebaseErrorMessage((err as { code?: string }).code));
   } finally {
     if (btn) {
       btn.textContent = 'Create Account';
@@ -136,14 +155,14 @@ export async function doRegister() {
 }
 
 export async function doLogin() {
-  const email = document.getElementById('l-email')?.value.trim();
-  const pass = document.getElementById('l-pass')?.value;
+  const email = inputValue('l-email');
+  const pass = inputValue('l-pass', false);
 
   if (!email || !pass) {
     return window.showToast('Please fill all fields');
   }
 
-  const btn = document.querySelector('#login .btn');
+  const btn = document.querySelector<HTMLButtonElement>('#login .btn');
   if (btn) {
     btn.textContent = 'Signing in...';
     btn.disabled = true;
@@ -154,7 +173,7 @@ export async function doLogin() {
     window.showToast('Welcome back ✦');
     window.goTo('home');
   } catch (err) {
-    window.showToast(firebaseErrorMessage(err.code));
+    window.showToast(firebaseErrorMessage((err as { code?: string }).code));
   } finally {
     if (btn) {
       btn.textContent = 'Sign In';
@@ -187,17 +206,18 @@ export async function doGoogleSignIn() {
     }
     window.goTo('home');
   } catch (err) {
-    if (err.code !== 'auth/popup-closed-by-user') {
-      window.showToast(firebaseErrorMessage(err.code));
+    if ((err as { code?: string }).code !== 'auth/popup-closed-by-user') {
+      window.showToast(firebaseErrorMessage((err as { code?: string }).code));
     }
   }
 }
 
 export async function saveProfile() {
-  const name = document.getElementById('ep-name')?.value.trim();
-  const phone = document.getElementById('ep-phone')?.value.trim();
+  if (!auth.currentUser) return window.showToast('Please sign in');
+  const name = inputValue('ep-name');
+  const phone = inputValue('ep-phone');
   if (!name) return window.showToast('Name cannot be empty');
-  const btn = document.querySelector('#edit-profile .btn-primary');
+  const btn = document.querySelector<HTMLButtonElement>('#edit-profile .btn-primary');
   if (btn) {
     btn.textContent = 'Saving...';
     btn.disabled = true;
@@ -223,9 +243,9 @@ export async function doSignOut() {
   window.goTo('splash');
 }
 
-function firebaseErrorMessage(code) {
+function firebaseErrorMessage(code?: string): string {
   console.warn('[Siphika] Firebase auth error code:', code);
-  const messages = {
+  const messages: Record<string, string> = {
     'auth/email-already-in-use': 'Email already registered — sign in instead',
     'auth/invalid-email': 'Invalid email address',
     'auth/weak-password': 'Password is too weak — use at least 8 characters',
@@ -235,5 +255,5 @@ function firebaseErrorMessage(code) {
     'auth/network-request-failed': 'No internet connection',
     'auth/invalid-credential': 'Invalid email or password',
   };
-  return messages[code] || 'Something went wrong — please try again';
+  return (code && messages[code]) || 'Something went wrong — please try again';
 }

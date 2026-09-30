@@ -1,8 +1,8 @@
 # Backlog / Future Plans
 
-- Finish the TypeScript migration: `functions/` is done; the client
-  modules in `src/` (plus `tsconfig.json` and the Vite build step)
-  remain, smallest first, `main.js` last.
+- ~~Finish the TypeScript migration~~ — done. `functions/` and all of
+  `src/` (8 client modules plus `main.ts`) are now TypeScript, strict
+  mode, verified via `npm run typecheck` and real Playwright runs.
 - Formalize Playwright as the project's test/E2E framework. The
   one-off driver at `.claude/skills/run-siphika-chauffeur/driver.mjs`
   is a working starting point, but isn't a real test suite yet.

@@ -4,7 +4,7 @@
 import { mapState } from './maps.module.js';
 
 const THEME_KEY = 'siphika-theme';
-let currentTheme = 'dark';
+let currentTheme: 'dark' | 'light' = 'dark';
 
 export function initTheme() {
   try {
@@ -14,20 +14,20 @@ export function initTheme() {
   applyTheme(false);
 }
 
-export function applyTheme(animate = true) {
+export function applyTheme(animate: boolean = true) {
   document.documentElement.setAttribute('data-theme', currentTheme);
   const icon = currentTheme === 'dark' ? '🌙' : '☀️';
   const label =
     currentTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
 
-  document.querySelectorAll('.theme-toggle-btn').forEach((btn) => {
+  document.querySelectorAll<HTMLElement>('.theme-toggle-btn').forEach((btn) => {
     btn.textContent = icon;
     btn.title = label;
     btn.setAttribute('aria-label', label);
   });
 
   if (mapState.map && window.google?.maps) {
-    mapState.map.setOptions({ styles: getMapStyle() });
+    (mapState.map as google.maps.Map).setOptions({ styles: getMapStyle() });
   }
   if (animate)
     window.showToast(
@@ -43,7 +43,7 @@ export function toggleTheme() {
   applyTheme(true);
 }
 
-export function getMapStyle() {
+export function getMapStyle(): google.maps.MapTypeStyle[] {
   if (currentTheme === 'dark') {
     return [
       { elementType: 'geometry', stylers: [{ color: '#0D0F14' }] },
