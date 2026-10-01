@@ -9,39 +9,27 @@
 
 ## Cordova / Device
 
-- **Blocked, worse than first thought:** the Google Maps API key's
-  HTTP referrer allowlist doesn't include `https://localhost` — the
-  fixed origin every Cordova WebView runs at — so Maps fails on-device
-  with `RefererNotAllowedMapError` (confirmed via logcat, on both the
-  emulator and a real device). Fix: add `https://localhost/*` to the
-  key's allowed referrers in Google Cloud Console. Beyond just
-  blocking route/distance (the "Select a route first" guard), on a
-  real device the pickup/destination `<input>` fields became
-  completely untappable once Maps failed — taps on them didn't focus
-  the field at all, instead jumping the page to the bottom of the
-  screen. This points to Google's own Places `Autocomplete` error
-  decoration (visually seen as a tiled "Sorry! Something went wrong"
-  overlay on top of both inputs) intercepting touches on the
-  elements it wraps. Until the referrer is fixed, pickup/destination
-  may not be fillable on-device at all, by typing or otherwise —
-  not just their route/autocomplete functionality.
-- Drive the full booking + payment flow on the emulator/device.
-  Confirmed on both the `Pixel_6_Pro_API_34` emulator and a real
-  device (Samsung SM-G990E, connected over wireless adb): the app
-  boots into the real UI, registration (Firebase Auth + Firestore
-  write) and login both work end-to-end, the splash "Sign In" fix
-  works, and `confirmBooking()`'s `createBooking` Cloud Function
-  round-trip reaches the backend correctly (returned a real
-  validation error for a test submission missing pickup/destination).
-  Not yet reached on-device: a successfully completed booking, or any
-  PayFast payment — both need the Maps referrer fix above first.
-- Verify the PayFast checkout flow specifically through
-  `cordova-plugin-inappbrowser` on-device. Only the plain-browser
-  `window.open()` fallback path (used when `window.cordova` is
-  undefined) has been tested. Also blocked by the Maps referrer issue
-  above: hourly bookings force cash and skip PayFast entirely (see
-  `setTripType()`), so reaching a real online-payment booking
-  on-device needs a route, which needs Maps working.
+- ~~Maps referrer blocking on-device bookings~~ — fixed by adding
+  `https://localhost/*` to the Maps API key's allowed referrers in
+  Google Cloud Console. Confirmed on the real device: Places
+  Autocomplete, the interactive map, and real Routes API fares all
+  work correctly now, and the pickup/destination inputs are fillable
+  again.
+- ~~Drive the full booking + payment flow on the emulator/device~~ —
+  done, on both the `Pixel_6_Pro_API_34` emulator and a real device
+  (Samsung SM-G990E, connected over wireless adb): registration,
+  login, the splash "Sign In" fix, a real non-hourly booking with a
+  real resolved route/fare, and a full PayFast payment through
+  `cordova-plugin-inappbrowser` (see below) all verified end-to-end.
+- ~~Verify the PayFast checkout flow through
+  `cordova-plugin-inappbrowser`~~ — done, and it surfaced a real bug:
+  `pfEncode` used JS's `encodeURIComponent`, which leaves `! ~ * ' ( )`
+  unescaped, while PayFast's PHP backend's `urlencode()` escapes all
+  of those — so any field containing one (e.g. a real resolved
+  address like "Airport (JNB)") broke the outgoing signature with a
+  400 from PayFast. Fixed in `functions/src/index.ts` and redeployed;
+  confirmed on-device with the exact address that triggered it,
+  payment completed and the ITN webhook marked it `paid`.
 - Build real Google Sign-In support on-device. `doGoogleSignIn()`
   currently just shows "not available in the app yet — use email"
   when running under Cordova, since Firebase's `signInWithPopup`

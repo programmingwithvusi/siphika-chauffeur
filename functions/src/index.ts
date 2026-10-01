@@ -111,9 +111,14 @@ function payfastHost(): string {
     : 'sandbox.payfast.co.za';
 }
 
-// PayFast requires '+' for spaces (not %20).
+// PayFast requires '+' for spaces (not %20), and its PHP backend's
+// urlencode() escapes a few characters JS's encodeURIComponent leaves
+// raw (! ~ * ' ( )) — without this, any field containing one of those
+// (e.g. a resolved address like "Airport (JNB)") breaks the signature.
 function pfEncode(v: string): string {
-  return encodeURIComponent(v).replace(/%20/g, '+');
+  return encodeURIComponent(v)
+    .replace(/%20/g, '+')
+    .replace(/[!'()*~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 // Field order here follows PayFast's own documented table (merchant details,
