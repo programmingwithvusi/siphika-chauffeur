@@ -44,6 +44,9 @@ interface GoogleSignInPlugin {
     onError: (error: string) => void,
   ): void;
   signOut(onSuccess: () => void, onError: (error: string) => void): void;
+  // Fully revokes consent — unlike signOut(), this is what actually makes
+  // the account picker reappear on the next signIn() call.
+  disconnect(onSuccess: () => void, onError: (error: string) => void): void;
   oneTapLogin(
     onSuccess: (result: string) => void,
     onError: (error: string) => void,

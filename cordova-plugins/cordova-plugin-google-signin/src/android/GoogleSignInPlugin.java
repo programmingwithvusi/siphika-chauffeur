@@ -146,8 +146,27 @@ public class GoogleSignInPlugin extends CordovaPlugin {
         callbackContext.success(getSuccessMessageInJsonString(String.valueOf(isSignedIn)));
     }
 
+    // Was a stub that always errored ("Not available on Android."). A plain
+    // signOut() only clears this client's session — the next getSignInIntent()
+    // call still silently re-selects the same account via Android's own
+    // account-chooser memory. revokeAccess() fully revokes consent, which is
+    // what actually forces the picker to reappear on the next sign-in.
     private void disconnect(CallbackContext callbackContext) {
-        callbackContext.error(getErrorMessageInJsonString("Not available on Android."));
+        mCallbackContext = callbackContext;
+        GoogleSignInOptions gso = getGoogleSignInOptions();
+        GoogleSignInClient mGoogleSignInClient = GoogleSignIn.getClient(mContext, gso);
+        mGoogleSignInClient.revokeAccess().addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                account = null;
+                mCallbackContext.success(getSuccessMessageInJsonString("Disconnected"));
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception ex) {
+                mCallbackContext.error(getErrorMessageInJsonString(ex.getMessage()));
+            }
+        });
     }
 
     private void signIn(CallbackContext callbackContext) {

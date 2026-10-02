@@ -271,6 +271,23 @@ export async function saveProfile() {
 
 export async function doSignOut() {
   if (!confirm('Sign out?')) return;
+  // Also disconnect the native Google client — plain signOut() only clears
+  // its session; the next "Continue with Google" tap would still silently
+  // re-select the same account via Android's own account-chooser memory.
+  // disconnect() fully revokes consent, which actually brings the picker
+  // back.
+  const plugin = window.cordova?.plugins?.GoogleSignInPlugin;
+  if (plugin) {
+    await new Promise<void>((resolve) => {
+      plugin.disconnect(
+        () => resolve(),
+        (err) => {
+          console.warn('[Siphika] Native Google disconnect failed:', err);
+          resolve();
+        },
+      );
+    });
+  }
   await signOut(auth);
   window.goTo('splash');
 }
