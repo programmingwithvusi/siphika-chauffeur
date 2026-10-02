@@ -7,8 +7,11 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  type User,
 } from 'firebase/auth';
 import {
   doc,
@@ -182,33 +185,62 @@ export async function doLogin() {
   }
 }
 
-export async function doGoogleSignIn() {
-  if (window.cordova) {
-    return window.showToast(
-      'Google sign-in is not available in the app yet — use email',
-    );
+// Shared by both the browser (signInWithPopup) and native
+// (signInWithCredential) Google sign-in paths below.
+async function upsertGoogleProfile(user: User) {
+  const userRef = doc(db, 'users', user.uid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      name: user.displayName,
+      email: user.email,
+      phone: user.phoneNumber || '',
+      photoURL: user.photoURL,
+      tier: 'standard',
+      totalRides: 0,
+      rating: 0,
+      createdAt: serverTimestamp(),
+    });
   }
+}
+
+export async function doGoogleSignIn() {
+  if (window.cordova) return doGoogleSignInNative();
   try {
     const { user } = await signInWithPopup(auth, googleProvider);
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        name: user.displayName,
-        email: user.email,
-        phone: user.phoneNumber || '',
-        photoURL: user.photoURL,
-        tier: 'standard',
-        totalRides: 0,
-        rating: 0,
-        createdAt: serverTimestamp(),
-      });
-    }
+    await upsertGoogleProfile(user);
     window.goTo('home');
   } catch (err) {
     if ((err as { code?: string }).code !== 'auth/popup-closed-by-user') {
       window.showToast(firebaseErrorMessage((err as { code?: string }).code));
     }
+  }
+}
+
+// cordova-plugin-google-signin: a native sign-in sheet that returns a
+// Google ID token, which we exchange for a Firebase credential — signInWithPopup
+// doesn't work inside a WebView, so this is the real Cordova equivalent.
+async function doGoogleSignInNative() {
+  const plugin = window.cordova?.plugins?.GoogleSignInPlugin;
+  if (!plugin) {
+    return window.showToast('Google sign-in is not available on this device');
+  }
+  try {
+    const raw = await new Promise<string>((resolve, reject) => {
+      plugin.signIn(resolve, reject);
+    });
+    const result = JSON.parse(raw) as GoogleSignInResult;
+    const idToken = result.message?.id_token;
+    if (!idToken) throw new Error('No ID token returned from native sign-in');
+    const { user } = await signInWithCredential(
+      auth,
+      GoogleAuthProvider.credential(idToken),
+    );
+    await upsertGoogleProfile(user);
+    window.goTo('home');
+  } catch (err) {
+    console.error('[Siphika] Native Google sign-in failed:', err);
+    window.showToast('Google sign-in failed — please try again or use email');
   }
 }
 

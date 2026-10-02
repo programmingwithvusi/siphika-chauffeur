@@ -36,7 +36,8 @@
     "sharp": "^0.35.4",
     "terser": "^5.0.0",
     "typescript": "~5.9.3",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "cordova-plugin-google-signin": "file:cordova-plugins/cordova-plugin-google-signin"
   },
   "cordova": {
     "plugins": {
@@ -47,7 +48,11 @@
       "cordova-plugin-statusbar": {},
       "cordova-plugin-inappbrowser": {},
       "cordova-plugin-vibration": {},
-      "cordova-plugin-file": {}
+      "cordova-plugin-file": {},
+      "cordova-plugin-google-signin": {
+        "REVERSED_CLIENT_ID": "com.googleusercontent.apps.757873572049-6is91fq8sjtvcklcrntt2j388negd8c6",
+        "CLIENT_ID": "757873572049-6is91fq8sjtvcklcrntt2j388negd8c6.apps.googleusercontent.com"
+      }
     },
     "platforms": [
       "browser",

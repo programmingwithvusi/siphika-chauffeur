@@ -19,10 +19,44 @@ interface CordovaInAppBrowserRef {
   close(): void;
 }
 
+interface GoogleSignInResult {
+  status: string;
+  message: {
+    id: string;
+    display_name: string;
+    email: string;
+    photo_url: string;
+    id_token: string;
+  };
+}
+
+// The plugin's native side calls CallbackContext.success/error with a raw
+// JSON-encoded string, and its www/ JS wrapper passes that straight through
+// without parsing — so every callback here receives a string to JSON.parse(),
+// not an already-parsed object.
+interface GoogleSignInPlugin {
+  signIn(
+    onSuccess: (result: string) => void,
+    onError: (error: string) => void,
+  ): void;
+  isSignedIn(
+    onSuccess: (signedIn: string) => void,
+    onError: (error: string) => void,
+  ): void;
+  signOut(onSuccess: () => void, onError: (error: string) => void): void;
+  oneTapLogin(
+    onSuccess: (result: string) => void,
+    onError: (error: string) => void,
+  ): void;
+}
+
 interface Window {
   cordova?: {
     InAppBrowser?: {
       open(url: string, target: string, options: string): CordovaInAppBrowserRef;
+    };
+    plugins?: {
+      GoogleSignInPlugin?: GoogleSignInPlugin;
     };
   };
   // cordova-plugin-statusbar's global, guarded by `if (window.StatusBar)`

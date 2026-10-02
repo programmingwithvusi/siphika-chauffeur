@@ -114,4 +114,5 @@
     <plugin name="cordova-plugin-vibration" spec="^3.1.1" />
     <plugin name="cordova-plugin-file" spec="^8.0.0" />
     <hook type="before_prepare" src="hooks/before_prepare/010-fix-platform-esm.cjs" />
+    <hook type="before_prepare" src="hooks/before_prepare/020-copy-google-services.cjs" />
 </widget>

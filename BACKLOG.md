@@ -30,26 +30,38 @@
   400 from PayFast. Fixed in `functions/src/index.ts` and redeployed;
   confirmed on-device with the exact address that triggered it,
   payment completed and the ITN webhook marked it `paid`.
-- Build real Google Sign-In support on-device. `doGoogleSignIn()`
-  currently just shows "not available in the app yet — use email"
-  when running under Cordova, since Firebase's `signInWithPopup`
-  doesn't work inside a WebView. Needs a native plugin
-  (e.g. `cordova-plugin-googleplus` or Firebase's native Google
-  Sign-In SDK via a plugin bridge).
-  The browser/dev-testing path is also currently broken: the CSP's
+- ~~Build real Google Sign-In support on-device~~ — done, via
+  `cordova-plugin-google-signin` (`cordova-plugin-googleplus`, the
+  originally-planned option, has been archived/dead since 2023).
+  Needed a real `google-services.json` at the project root (gitignored,
+  copied into `platforms/android/app/` on every prepare by the new
+  `hooks/before_prepare/020-copy-google-services.cjs` hook — the
+  plugin applies Google's Gradle plugin, which hard-requires that
+  file and has no way to place it itself), the debug keystore's SHA-1
+  registered against the `za.co.siphika.chauffeur` app specifically
+  (a stale `com.siphika.sihphikachauffeur` app already existed in the
+  same Firebase project and had to be told apart from the real one),
+  and two local patches to the plugin itself (installed from a git
+  clone, not npm, since it's not published there): its JS wrapper
+  never parses the JSON string Cordova's bridge delivers, and its
+  native Android code routed the sign-in through a second, separate
+  native FirebaseAuth session and hands back *that* session's Firebase
+  ID token — not the raw Google ID token this app's JS/web Firebase
+  SDK needs for `signInWithCredential()`. Verified signed in on the
+  real device, landing on Home with the real Google profile name
+  and photo initials.
+  The browser/dev-testing path is still broken separately: the CSP's
   `script-src` blocks `https://apis.google.com`, which Firebase's
   popup-based Google sign-in needs to load
-  (`auth/internal-error` in the console). Fixing that CSP gap is
-  lower priority than the native plugin above, since this flow only
-  runs in plain-browser testing, not the real Cordova app.
+  (`auth/internal-error` in the console). Low priority — it only
+  affects plain-browser dev testing, not the real Cordova app, which
+  now has its own working native path above.
 - Remove startup dependence on remote resources: the 3 Unsplash
   onboarding images and the Google Fonts stylesheet delay the page
   load event, and Cordova aborts with "Application Error" if that
   exceeds `LoadUrlTimeoutValue` (now 60s). Bundle them locally.
 - Remove the unused `cordova-plugin-file` (nothing in `src/` uses it;
   it adds an `onFileSystemPathsReady` startup step).
-- `apis.google.com` CSP refusal also appears in the on-device console
-  at startup, not only when clicking Google sign-in.
 - iOS build and testing. `config.xml` has iOS platform config, but
   only `android` and `browser` are added under `cordova.platforms` in
   `package.json` — iOS needs a Mac with Xcode, which hasn't been
