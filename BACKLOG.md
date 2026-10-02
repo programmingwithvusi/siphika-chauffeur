@@ -1,5 +1,35 @@
 # Backlog / Future Plans
 
+## Passenger-side follow-ups (parked while building the driver side)
+
+Passenger booking + payment is done and verified end-to-end. These are
+what's left on the passenger side — parked for now since most of them
+are naturally driver-side-first: they need a real driver counterpart
+generating real trigger events before they can be built properly
+rather than mocked.
+
+- Live tracking: the screen and Firestore listener already exist, but
+  there's no driver device yet to generate a real position/status to
+  track. Needs the driver side first.
+- Push notifications: the bell/badge UI is local-only (DOM state), not
+  backed by real push (FCM). Worth building for real once there are
+  real trigger events to notify about (driver accepted, en route,
+  arrived) rather than mocking them.
+- Post-ride ratings: the stat shows on profile, but there's no actual
+  rating-submission flow. Naturally happens once a driver can mark a
+  trip complete.
+- In-app chat/calling the driver: not built at all — needs a driver to
+  exist first.
+- Payment Methods screen: still an honest placeholder, no real card
+  tokenization/storage. Not blocked by the driver side, just parked
+  here so it isn't lost track of.
+- Refer & Earn payout: the referral-linking plumbing works
+  (`linkReferral`), but there's no actual credit or payout mechanism —
+  pending a decision on the business terms (amount, timing, how a
+  credit reduces a fare). Also not blocked by the driver side.
+
+## General
+
 - ~~Finish the TypeScript migration~~ — done. `functions/` and all of
   `src/` (8 client modules plus `main.ts`) are now TypeScript, strict
   mode, verified via `npm run typecheck` and real Playwright runs.
