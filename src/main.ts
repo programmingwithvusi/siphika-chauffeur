@@ -454,21 +454,33 @@ async function launchPayfastCheckout(bookingId: string) {
 
   const inAppBrowser = window.cordova?.InAppBrowser;
   if (inAppBrowser) {
-    await new Promise<void>((resolve) => {
+    // The InAppBrowser's 'exit' event fires whenever it closes for ANY
+    // reason — reaching PayFast's return/cancel redirect (closed by us,
+    // below) just as much as the user manually closing an error page or
+    // backing out. Track which one actually happened so we don't claim
+    // "Payment submitted" when nothing was ever submitted.
+    const reachedPayfastReturn = await new Promise<boolean>((resolve) => {
+      let reached = false;
       const ref = inAppBrowser.open(url, '_blank', 'location=yes,toolbar=yes');
       const finish = () => {
         ref.removeEventListener('loadstart', onLoadStart);
         ref.removeEventListener('exit', finish);
-        resolve();
+        resolve(reached);
       };
       const onLoadStart = (event: CordovaInAppBrowserEvent) => {
-        if (/\/(paymentReturn|paymentCancel)\b/.test(event.url || ''))
+        if (/\/(paymentReturn|paymentCancel)\b/.test(event.url || '')) {
+          reached = true;
           ref.close();
+        }
       };
       ref.addEventListener('loadstart', onLoadStart);
       ref.addEventListener('exit', finish);
     });
-    showToast('Payment submitted — confirming…');
+    showToast(
+      reachedPayfastReturn
+        ? 'Payment submitted — confirming…'
+        : 'Checkout closed — you can try again from Rides',
+    );
   } else {
     // Browser dev fallback: no InAppBrowser here. Final status still arrives
     // via the Firestore listener regardless of how the tab is closed.
